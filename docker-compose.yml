@@ -1,0 +1,13 @@
+services:
+  fake-gcs-server:
+    image: fsouza/fake-gcs-server
+    container_name: fake-gcs-server
+    ports:
+      - "4443:4443"
+    # http://localhost:4443/my-bucket/my-object.txt
+    command: >
+      -scheme http
+      -public-host localhost:4443
+      -port 4443
+    volumes:
+      - ./.docker-data:/data
