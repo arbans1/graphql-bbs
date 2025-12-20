@@ -1,0 +1,209 @@
+import net.ltgt.gradle.errorprone.CheckSeverity
+
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.5.9'
+    id 'io.spring.dependency-management' version '1.1.7'
+    id 'org.hibernate.orm' version '6.6.39.Final'
+    id 'org.graalvm.buildtools.native' version '0.10.6'
+
+    // 코드 품질 및 정적 분석
+    id 'com.diffplug.spotless' version '6.25.0'
+    id 'checkstyle'
+    id 'jacoco'
+    id 'net.ltgt.errorprone' version '4.1.0'
+}
+
+group = projectGroup
+version = projectVersion
+description = 'Bulletin Board System using graphql'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(javaVersion as int)
+    }
+}
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Spring Boot Starters
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-graphql'
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+    // Database
+    runtimeOnly 'org.postgresql:postgresql'
+    implementation 'com.querydsl:querydsl-jpa:5.1.0:jakarta'
+    annotationProcessor "com.querydsl:querydsl-apt:5.1.0:jakarta"
+    annotationProcessor "jakarta.annotation:jakarta.annotation-api"
+    annotationProcessor "jakarta.persistence:jakarta.persistence-api"
+
+    // Null Safety
+    errorprone 'com.google.errorprone:error_prone_core:2.31.0'
+    annotationProcessor 'com.uber.nullaway:nullaway:0.12.14'
+    compileOnly 'org.jspecify:jspecify:1.0.0'
+
+    // Utilities
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    implementation 'org.mapstruct:mapstruct:1.6.3'
+    annotationProcessor 'org.mapstruct:mapstruct-processor:1.6.3'
+    annotationProcessor "org.projectlombok:lombok-mapstruct-binding:0.2.0"
+    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+
+    // Testing
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
+    testImplementation 'org.springframework.graphql:spring-graphql-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+// ---------------------------------------------------------
+// 컴파일 및 정적 분석 (NullAway)
+// ---------------------------------------------------------
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    if (name.contains("Aot") || name.contains("Test")) {
+        options.errorprone.enabled = false
+    } else {
+        options.errorprone {
+            check("NullAway", CheckSeverity.ERROR)
+            option("NullAway:AnnotatedPackages", projectGroup as String)
+            option("NullAway:TreatGeneratedAsUnannotated", "true")
+            check("MissingOverride", CheckSeverity.ERROR)
+            check("DefaultCharset", CheckSeverity.ERROR)
+        }
+    }
+}
+
+// ---------------------------------------------------------
+// 테스트 및 커버리지 (JaCoCo)
+// ---------------------------------------------------------
+tasks.named('test') {
+    useJUnitPlatform()
+    finalizedBy jacocoTestReport
+}
+
+jacoco {
+    toolVersion = "0.8.12"
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true
+        html.required = true
+    }
+    afterEvaluate {
+        classDirectories.setFrom(files(classDirectories.files.collect {
+            fileTree(dir: it, exclude: [
+                '**/Q*',
+                '**/dto/**',
+                '**/entity/**'
+            ])
+        }))
+    }
+}
+
+// ---------------------------------------------------------
+// 코드 스타일 (Spotless / Checkstyle)
+// ---------------------------------------------------------
+spotless {
+    java {
+        target 'src/*/java/**/*.java'
+        lineEndings = 'UNIX'
+        eclipse().configFile('config/spotless/naver-eclipse-formatter.xml')
+        importOrder(
+                '\\#',
+                'java',
+                'javax',
+                'jakarta',
+                'org',
+                'net',
+                'com',
+                '',
+                projectGroup as String
+                )
+        removeUnusedImports()
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+    groovyGradle {
+        target '*.gradle', 'gradle/**/*.gradle'
+        greclipse()
+        indentWithSpaces(4)
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+}
+
+checkstyle {
+    toolVersion = '10.12.4'
+    configFile = file('config/checkstyle/naver-checkstyle-rules.xml')
+    configProperties = ['suppressionFile': file('config/checkstyle/naver-checkstyle-suppressions.xml')]
+    ignoreFailures = false
+    maxWarnings = 0
+    maxErrors = 0
+}
+
+tasks.withType(Checkstyle).configureEach {
+    if (name.contains("Aot")) {
+        enabled = false
+    }
+}
+
+check.dependsOn 'checkstyleMain'
+
+// ---------------------------------------------------------
+// Git Hook & 자동화 태스크
+// ---------------------------------------------------------
+task codeQuality {
+    dependsOn 'spotlessCheck', 'checkstyleMain'
+    group = 'verification'
+}
+
+task formatCode {
+    dependsOn 'spotlessApply'
+    group = 'formatting'
+}
+
+tasks.register('installGitHooks') {
+    group = 'verification'
+    doLast {
+        def hookFile = file('.git/hooks/pre-commit')
+        hookFile.text = """#!/bin/sh
+if [ -f "gradlew.bat" ]; then CMD="./gradlew.bat"; else CMD="./gradlew"; fi
+echo "🧹 Formatting code..."
+\$CMD formatCode && git add -u
+echo "🔍 Checking code quality..."
+\$CMD codeQuality
+"""
+        hookFile.setExecutable(true)
+    }
+}
+
+tasks.named('build') {
+    dependsOn 'installGitHooks'
+}
+
+hibernate {
+    enhancement {
+        enableAssociationManagement = true
+    }
+}
+
+tasks.withType(Javadoc).configureEach {
+    options.encoding = 'UTF-8'
+}

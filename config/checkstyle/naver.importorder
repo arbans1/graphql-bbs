@@ -1,0 +1,10 @@
+# naver coding convention
+# [blankline-between-import-group]
+7=com.example
+6=
+5=com
+4=net
+3=org
+2=jakarta
+1=javax
+0=java

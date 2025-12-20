@@ -1,0 +1,27 @@
+spring:
+  config:
+    import: "optional:file:.env[.properties]"
+
+  application:
+    name: bbs
+
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        "[format_sql]": true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  graphql:
+    graphiql:
+      enabled: true
+    http:
+      path: /graphql

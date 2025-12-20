@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+	<!-- Lombok 관련 경고 제외 -->
+	<Match>
+		<Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+		<Class name="~.*\.dto\..*"/>
+	</Match>
+
+	<!-- Model 클래스의 EI_EXPOSE_REP 경고 제외 (JPA 엔티티는 getter/setter로 관계 노출) -->
+	<Match>
+		<Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+		<Class name="~.*\.model\..*"/>
+	</Match>
+
+	<!-- Controller 클래스의 EI_EXPOSE_REP 경고 제외 (Response DTO 및 생성자 주입) -->
+	<Match>
+		<Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+		<Class name="~.*\.controller\..*"/>
+	</Match>
+
+	<!-- Service 클래스의 EI_EXPOSE_REP2 경고 제외 (생성자 주입) -->
+	<Match>
+		<Bug pattern="EI_EXPOSE_REP2"/>
+		<Class name="~.*\.service\..*"/>
+	</Match>
+
+	<!-- Config 클래스의 EI_EXPOSE_REP2 경고 제외 (생성자 주입) -->
+	<Match>
+		<Bug pattern="EI_EXPOSE_REP2"/>
+		<Class name="~.*\.config\..*"/>
+	</Match>
+
+	<!-- Spring Entity 관련 경고 제외 -->
+	<Match>
+		<Bug pattern="SE_NO_SERIALVERSIONID"/>
+		<Class name="~.*\.model\..*"/>
+	</Match>
+
+	<!-- Test 클래스 경고 제외 -->
+	<Match>
+		<Class name="~.*Test.*"/>
+	</Match>
+
+	<!-- Configuration 클래스 경고 제외 -->
+	<Match>
+		<Bug pattern="UWF_UNWRITTEN_FIELD"/>
+		<Class name="~.*Config.*"/>
+	</Match>
+
+	<!-- Spring Boot Main 클래스 경고 제외 -->
+	<Match>
+		<Class name="com.example.demo.DemoApplication"/>
+	</Match>
+</FindBugsFilter>
+
