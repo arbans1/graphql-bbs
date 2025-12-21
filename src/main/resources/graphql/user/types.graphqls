@@ -40,7 +40,7 @@ type User {
 
 type UserProfile {
   "사용자 이름 (닉네임)"
-  name: String!
+  nickname: String!
 
   "프로필 이미지 URL"
   imageUrl: String
