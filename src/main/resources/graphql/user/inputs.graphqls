@@ -1,0 +1,31 @@
+# ==========================================
+# User Inputs (사용자 관련 입력)
+# ==========================================
+
+"""
+회원가입 입력
+"""
+input RegisterInput {
+  "사용자 ID"
+  userId: String!
+
+  "비밀번호"
+  password: String!
+
+  "닉네임"
+  nickname: String!
+
+  "이메일"
+  email: String!
+}
+
+"""
+로그인 입력
+"""
+input LoginInput {
+  "사용자 ID"
+  userId: String!
+
+  "비밀번호"
+  password: String!
+}

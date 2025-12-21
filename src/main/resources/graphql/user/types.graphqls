@@ -1,0 +1,67 @@
+# ==========================================
+# User Types (사용자 타입)
+# ==========================================
+
+"""
+사용자 타입
+소셜 로그인(Google/Kakao/Naver)을 통해 가입한 사용자 정보
+"""
+type User {
+  "사용자 고유 ID"
+  id: ID!
+  
+  "사용자 이름 (닉네임)"
+  name: String!
+  
+  """
+  이메일 (소셜 로그인에서 가져옴)
+  본인 또는 관리자만 조회 가능
+  """
+  email: String! @auth(requires: SELF_OR_ADMIN)
+  
+  "프로필 이미지 URL (소셜 로그인에서 가져옴)"
+  profileImageUrl: String
+  
+  "사용자 역할"
+  role: UserRole!
+  
+  "가입 일시"
+  createdAt: DateTime!
+  
+  """
+  마지막 로그인 일시
+  본인 또는 관리자만 조회 가능
+  """
+  lastLoginAt: DateTime @auth(requires: SELF_OR_ADMIN)
+  
+  """
+  계정 상태
+  본인 또는 관리자만 조회 가능
+  """
+  status: UserStatus! @auth(requires: SELF_OR_ADMIN)
+}
+
+"""
+로그인 성공 응답
+"""
+type AuthPayload {
+  "인증 토큰 (JWT)"
+  accessToken: String!
+  
+  "리프레시 토큰"
+  refreshToken: String!
+  
+  "로그인한 사용자 정보"
+  user: User!
+  
+  "토큰 만료 시각 (초 단위)"
+  expiresIn: Int!
+}
+
+"""
+현재 인증된 사용자 정보 조회 결과
+"""
+type MePayload {
+  "인증된 사용자 정보"
+  user: User!
+}

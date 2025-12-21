@@ -1,0 +1,21 @@
+# ==========================================
+# Pagination (커서 기반 페이지네이션)
+# ==========================================
+
+"""
+페이지 정보 (커서 기반 페이지네이션)
+Relay 스타일의 커서 기반 페이지네이션을 위한 메타데이터
+"""
+type PageInfo {
+  "다음 페이지가 있는지 여부"
+  hasNextPage: Boolean!
+  
+  "이전 페이지가 있는지 여부"
+  hasPreviousPage: Boolean!
+  
+  "시작 커서"
+  startCursor: String
+  
+  "끝 커서"
+  endCursor: String
+}

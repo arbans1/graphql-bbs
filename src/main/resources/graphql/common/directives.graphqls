@@ -1,0 +1,41 @@
+# ==========================================
+# Custom Directives (커스텀 지시자)
+# ==========================================
+
+"""
+권한 제어 지시자
+필드나 타입에 접근 권한을 지정합니다.
+
+사용 가능한 권한 레벨 (MVP 단순화):
+- GUEST: 비로그인 사용자 (모든 사용자)
+- MEMBER: 로그인한 일반 회원
+- ADMIN: 운영자만
+- SELF: 본인만 (User 타입 필드에서 사용)
+- SELF_OR_ADMIN: 본인 또는 운영자
+"""
+directive @auth(
+  """
+  필요한 권한 레벨
+  """
+  requires: AuthLevel!
+) on FIELD_DEFINITION | OBJECT
+
+"""
+권한 레벨 Enum (MVP 단순화)
+"""
+enum AuthLevel {
+  "비로그인 포함 모든 사용자"
+  GUEST
+  
+  "로그인한 회원"
+  MEMBER
+  
+  "운영자만"
+  ADMIN
+  
+  "본인만 (해당 객체의 소유자)"
+  SELF
+  
+  "본인 또는 운영자"
+  SELF_OR_ADMIN
+}

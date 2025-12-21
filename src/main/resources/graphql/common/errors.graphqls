@@ -1,0 +1,111 @@
+# ==========================================
+# Error Interface & Types (에러)
+# ==========================================
+
+"""
+모든 커스텀 에러가 구현해야 하는 기본 인터페이스입니다.
+클라이언트는 이 인터페이스를 통해 에러 메시지와 코드를 공통적으로 처리할 수 있습니다.
+"""
+interface BaseError {
+  "사용자에게 노출할 수 있는 에러 메시지"
+  message: String!
+  
+  "에러 식별을 위한 고유 코드 (예: BAD_USER_INPUT, NOT_FOUND)"
+  code: String!
+}
+
+# ==========================================
+# Helper Types
+# ==========================================
+
+"""
+필드별 구체적인 에러 정보를 담는 객체
+"""
+type FieldError {
+  "에러가 발생한 필드의 이름 (예: 'title', 'password')"
+  field: String!
+  
+  "해당 필드에 대한 사용자 친화적인 에러 메시지"
+  message: String!
+  
+  "구체적인 검증 실패 코드 (예: 'MIN_LENGTH', 'REQUIRED', 'INVALID_FORMAT')"
+  code: String
+}
+
+# ==========================================
+# Common Error Types
+# ==========================================
+
+"""
+입력값 검증 실패 시 사용하는 에러입니다. (HTTP 400 대응)
+여러 필드의 에러를 한 번에 반환하기 위해 fieldErrors 리스트를 포함합니다.
+"""
+type UserInputError implements BaseError {
+  message: String!
+  code: String!
+  fieldErrors: [FieldError!]!
+}
+
+"""
+인증되지 않은 사용자가 요청했을 때 사용하는 에러 (HTTP 401 대응)
+"""
+type AuthenticationError implements BaseError {
+  message: String!
+  code: String!
+}
+
+"""
+권한이 없는 작업을 요청했을 때 사용하는 에러 (HTTP 403 대응)
+예: 일반 회원이 [ADMIN] 기능을 요청한 경우
+"""
+type ForbiddenError implements BaseError {
+  message: String!
+  code: String!
+}
+
+"""
+요청한 리소스를 찾을 수 없을 때 사용하는 에러 (HTTP 404 대응)
+"""
+type NotFoundError implements BaseError {
+  message: String!
+  code: String!
+  resourceType: String
+}
+
+"""
+서버 내부 오류 등 예상치 못한 에러 (HTTP 500 대응)
+"""
+type InternalServerError implements BaseError {
+  message: String!
+  code: String!
+}
+
+"""
+레이트 리밋 에러 (비공감 쿨다운, 요청 제한 등)
+"""
+type RateLimitError implements BaseError {
+  message: String!
+  code: String!
+  
+  "다음 시도 가능 시각 (초 단위)"
+  retryAfter: Int!
+}
+
+# ==========================================
+# Success Types
+# ==========================================
+
+"""
+삭제 성공
+"""
+type DeleteSuccess {
+  message: String!
+  deletedId: ID!
+}
+
+"""
+로그아웃 성공
+"""
+type LogoutSuccess {
+  message: String!
+}

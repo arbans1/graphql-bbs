@@ -1,0 +1,32 @@
+# ==========================================
+# User Mutations (사용자 관련 Mutation)
+# ==========================================
+
+"""
+인증 관련 Mutation
+"""
+type AuthMutation {
+  "회원가입"
+  register(input: RegisterInput!): RegisterPayload!
+
+  "로그인"
+  login(input: LoginInput!): LoginPayload!
+
+  "로그아웃"
+  logout: LogoutPayload!
+
+  "토큰 리프레시"
+  refreshToken(refreshToken: String!): RefreshTokenPayload!
+}
+
+# ==========================================
+# Auth Payloads (Union)
+# ==========================================
+
+union RegisterPayload = AuthPayload | UserInputError
+
+union LoginPayload = AuthPayload | AuthenticationError
+
+union LogoutPayload = LogoutSuccess | AuthenticationError
+
+union RefreshTokenPayload = AuthPayload | AuthenticationError
