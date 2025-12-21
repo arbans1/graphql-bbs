@@ -12,16 +12,16 @@ import lombok.Getter;
 @ConfigurationProperties(prefix = "jwt")
 public class JwtProperties {
 
-	/** 액세스 토큰 비밀 키. */
+	/** 액세스 토큰 비밀 키 */
 	private final String accessSecret;
 
-	/** 리프레시 토큰 비밀 키. */
+	/** 리프레시 토큰 비밀 키 */
 	private final String refreshSecret;
 
-	/** 액세스 토큰 만료 시간 (밀리초). */
+	/** 액세스 토큰 만료 시간 (밀리초) */
 	private final long accessExpiration;
 
-	/** 리프레시 토큰 만료 시간 (밀리초). */
+	/** 리프레시 토큰 만료 시간 (밀리초) */
 	private final long refreshExpiration;
 
 }

@@ -3,21 +3,26 @@ package com.example.bbs.global.security;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Date;
+import java.util.List;
 
 import javax.crypto.SecretKey;
 
 import org.jspecify.annotations.NullMarked;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
 
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * JWT 토큰 생성 및 검증 컴포넌트.
+ * JWT 토큰 생성 및 검증 컴포넌트
  * <p>
- * Access Token과 Refresh Token을 각각 별도 시크릿 키로 서명하여 관리.
+ * Access Token과 Refresh Token을 각각 별도 시크릿 키로 서명하여 관리
  * </p>
  */
 @Component
@@ -48,7 +53,7 @@ public class JwtTokenProvider {
 	}
 
 	/**
-	 * 사용자 ID와 권한을 포함한 Access Token 생성.
+	 * 사용자 ID와 권한을 포함한 Access Token 생성
 	 *
 	 * @param userId 사용자 식별자 (TSID)
 	 * @param role 사용자 권한 (ADMIN, MEMBER, GUEST)
@@ -68,7 +73,7 @@ public class JwtTokenProvider {
 	}
 
 	/**
-	 * 사용자 ID만 포함한 Refresh Token 생성. Access Token 갱신 전용.
+	 * 사용자 ID만 포함한 Refresh Token 생성. Access Token 갱신 전용
 	 *
 	 * @param userId 사용자 식별자 (TSID)
 	 * @return 서명된 JWT 토큰
@@ -86,7 +91,7 @@ public class JwtTokenProvider {
 	}
 
 	/**
-	 * JWT 토큰에서 사용자 ID 추출.
+	 * JWT 토큰에서 사용자 ID 추출
 	 *
 	 * @param token JWT 토큰
 	 * @param isAccessToken Access Token 여부
@@ -105,7 +110,7 @@ public class JwtTokenProvider {
 	}
 
 	/**
-	 * JWT 토큰 유효성 검증. 서명, 만료 시간, 형식 확인.
+	 * JWT 토큰 유효성 검증. 서명, 만료 시간, 형식 확인
 	 *
 	 * @param token JWT 토큰
 	 * @param isAccessToken Access Token 여부
@@ -123,5 +128,22 @@ public class JwtTokenProvider {
 			log.debug("유효하지 않은 JWT 토큰입니다: {}", e.getMessage());
 			return false;
 		}
+	}
+
+	/**
+	* Access Token을 기반으로 Spring Security의 Authentication 객체 생성
+	* @param accessToken 유효성이 검증된 Access Token
+	* @return Authentication 객체
+	*/
+	public Authentication getAuthentication(String accessToken) {
+		Claims claims = Jwts.parser()
+			.verifyWith(accessKey)
+			.build()
+			.parseSignedClaims(accessToken)
+			.getPayload();
+		String userId = claims.getSubject();
+		String role = claims.get("role", String.class); // 페이로드에 저장했던 role
+		List<SimpleGrantedAuthority> authorities = List.of(new SimpleGrantedAuthority(role));
+		return new UsernamePasswordAuthenticationToken(userId, null, authorities);
 	}
 }
