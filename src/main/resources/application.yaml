@@ -25,3 +25,9 @@ spring:
       enabled: true
     http:
       path: /graphql
+
+jwt:
+  access-secret: ${JWT_SECRET}
+  refresh-secret: ${REFRESH_JWT_SECRET}
+  access-expiration: 3600000  # 1 시간(밀리초)
+  refresh-expiration: 604800000  # 7 일(밀리초)

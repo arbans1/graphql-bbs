@@ -16,7 +16,7 @@ type AuthMutation {
   logout: LogoutPayload!
 
   "토큰 리프레시"
-  refreshToken(refreshToken: String!): RefreshTokenPayload!
+  refreshToken: RefreshTokenPayload!
 }
 
 # ==========================================
