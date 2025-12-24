@@ -1,12 +1,10 @@
 package com.example.bbs.global.error;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.graphql.execution.DataFetcherExceptionResolverAdapter;
 import org.springframework.graphql.execution.ErrorType;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Component;
 
 import graphql.GraphQLError;
@@ -24,68 +22,16 @@ public class GraphqlExceptionResolver extends DataFetcherExceptionResolverAdapte
 	@Nullable
 	@Override
 	protected GraphQLError resolveToSingleError(Throwable ex, DataFetchingEnvironment env) {
-		if (ex instanceof InvalidInputException invalidInputEx) {
-			return buildInvalidInputError(invalidInputEx, env);
+		// 비즈니스 예외는 AOP에서 이미 처리됨.
+		// 여기서는 인증 실패(401)나 권한 없음(403) 같은 인프라 에러만 처리.
+		if (ex instanceof AccessDeniedException) {
+			return GraphqlErrorBuilder.newError(env)
+				.message("접근 권한이 없습니다.")
+				.errorType(ErrorType.FORBIDDEN)
+				.build();
 		}
 
-		if (ex instanceof NotFoundException notFoundEx) {
-			return buildNotFoundError(notFoundEx, env);
-		}
-
-		if (ex instanceof BusinessException businessEx) {
-			return buildBusinessError(businessEx, env);
-		}
-
-		// 처리되지 않은 예외는 null 반환하여 기본 처리기로 위임
+		// 처리되지 않은 나머지는 null 반환 (기본 500 에러 배열로 처리)
 		return null;
-	}
-
-	private GraphQLError buildInvalidInputError(InvalidInputException ex, DataFetchingEnvironment env) {
-		Map<String, Object> extensions = new HashMap<>();
-		extensions.put("code", ex.getCode());
-		extensions.put("fieldErrors", ex.getFieldErrors());
-
-		return GraphqlErrorBuilder.newError(env)
-			.message(ex.getMessage())
-			.errorType(ErrorType.BAD_REQUEST)
-			.extensions(extensions)
-			.build();
-	}
-
-	private GraphQLError buildNotFoundError(NotFoundException ex, DataFetchingEnvironment env) {
-		Map<String, Object> extensions = new HashMap<>();
-		extensions.put("code", ex.getCode());
-		if (ex.getResourceType() != null) {
-			extensions.put("resourceType", ex.getResourceType());
-		}
-
-		return GraphqlErrorBuilder.newError(env)
-			.message(ex.getMessage())
-			.errorType(ErrorType.NOT_FOUND)
-			.extensions(extensions)
-			.build();
-	}
-
-	private GraphQLError buildBusinessError(BusinessException ex, DataFetchingEnvironment env) {
-		ErrorType errorType = mapToErrorType(ex.getErrorCode());
-
-		Map<String, Object> extensions = new HashMap<>();
-		extensions.put("code", ex.getCode());
-
-		return GraphqlErrorBuilder.newError(env)
-			.message(ex.getMessage())
-			.errorType(errorType)
-			.extensions(extensions)
-			.build();
-	}
-
-	private ErrorType mapToErrorType(ErrorCode errorCode) {
-		return switch (errorCode) {
-			case BAD_USER_INPUT -> ErrorType.BAD_REQUEST;
-			case UNAUTHENTICATED -> ErrorType.UNAUTHORIZED;
-			case FORBIDDEN -> ErrorType.FORBIDDEN;
-			case NOT_FOUND -> ErrorType.NOT_FOUND;
-			case INTERNAL_SERVER_ERROR -> ErrorType.INTERNAL_ERROR;
-		};
 	}
 }

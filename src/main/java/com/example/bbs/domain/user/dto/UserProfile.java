@@ -9,8 +9,7 @@ import lombok.Getter;
 @Getter
 @Builder
 @NullMarked
-public class UserProfileDto {
+public class UserProfile {
 	private String nickname;
 	private @Nullable String imageUrl;
-
 }

@@ -9,7 +9,7 @@
 interface BaseError {
   "사용자에게 노출할 수 있는 에러 메시지"
   message: String!
-  
+
   "에러 식별을 위한 고유 코드 (예: BAD_USER_INPUT, NOT_FOUND)"
   code: String!
 }
@@ -24,12 +24,12 @@ interface BaseError {
 type FieldError {
   "에러가 발생한 필드의 이름 (예: 'title', 'password')"
   field: String!
-  
+
   "해당 필드에 대한 사용자 친화적인 에러 메시지"
   message: String!
-  
+
   "구체적인 검증 실패 코드 (예: 'MIN_LENGTH', 'REQUIRED', 'INVALID_FORMAT')"
-  code: String
+  code: String!
 }
 
 # ==========================================
@@ -86,7 +86,7 @@ type InternalServerError implements BaseError {
 type RateLimitError implements BaseError {
   message: String!
   code: String!
-  
+
   "다음 시도 가능 시각 (초 단위)"
   retryAfter: Int!
 }

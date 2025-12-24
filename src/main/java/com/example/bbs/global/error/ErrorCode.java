@@ -1,9 +1,17 @@
 package com.example.bbs.global.error;
 
+import org.jspecify.annotations.NullMarked;
+
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+
 /**
  * 공통 에러 코드 enum.
  * GraphQL errors.graphqls의 에러 타입들과 매핑됩니다.
  */
+@Getter
+@RequiredArgsConstructor
+@NullMarked
 public enum ErrorCode {
 
 	// 400 - 입력값 검증 실패
@@ -23,17 +31,4 @@ public enum ErrorCode {
 
 	private final String code;
 	private final String defaultMessage;
-
-	ErrorCode(String code, String defaultMessage) {
-		this.code = code;
-		this.defaultMessage = defaultMessage;
-	}
-
-	public String getCode() {
-		return code;
-	}
-
-	public String getDefaultMessage() {
-		return defaultMessage;
-	}
 }

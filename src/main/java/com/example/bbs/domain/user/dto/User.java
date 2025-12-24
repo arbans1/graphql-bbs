@@ -14,10 +14,10 @@ import com.example.bbs.domain.user.enums.UserStatus;
 @Getter
 @Builder
 @NullMarked
-public class UserDto {
+public class User {
 	private String id;
 	private String email;
-	private UserProfileDto profile;
+	private UserProfile profile;
 	private UserRole role;
 	private OffsetDateTime createdAt;
 	private @Nullable OffsetDateTime lastLoginAt;

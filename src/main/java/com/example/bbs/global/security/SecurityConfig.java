@@ -45,8 +45,8 @@ public class SecurityConfig {
 			// JWT 기반 무상태 인증
 			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			.authorizeHttpRequests(auth -> auth
-				// GraphQL 엔드포인트 누구나 접근 가능 (메서드 레벨에서 권한 검증)
-				.requestMatchers("/graphql").permitAll()
+				// GraphQL 엔드포인트 및 GraphiQL UI 누구나 접근 가능 (메서드 레벨에서 권한 검증)
+				.requestMatchers("/graphql", "/graphiql/**").permitAll()
 				// 그 외 모든 요청은 인증 필수
 				.anyRequest().authenticated())
 			// JWT 필터 우선 실행

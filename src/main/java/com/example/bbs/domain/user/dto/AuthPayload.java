@@ -5,12 +5,14 @@ import org.jspecify.annotations.NullMarked;
 import lombok.Builder;
 import lombok.Getter;
 
+import com.example.bbs.global.common.MutationResult;
+
 @Getter
 @Builder
 @NullMarked
-public class AuthResponseDto {
+public class AuthPayload implements MutationResult {
 	private String accessToken;
 	private String refreshToken;
-	private UserDto user;
+	private User user;
 	private long expiresIn;
 }
