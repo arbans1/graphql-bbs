@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import com.example.bbs.domain.user.dto.AuthPayload;
+import com.example.bbs.domain.user.dto.LoginInput;
 import com.example.bbs.domain.user.dto.RegisterInput;
 import com.example.bbs.domain.user.service.AuthService;
 import com.example.bbs.global.aop.GqlMutation;
@@ -35,6 +36,15 @@ public class AuthMutationController {
 		log.info("Register mutation called for username: {}", input.getUsername());
 		AuthPayload response = authService.register(input);
 		log.info("Register successful for username: {}", input.getUsername());
+		return response;
+	}
+
+	@SchemaMapping(typeName = "AuthMutation", field = "login")
+	@GqlMutation
+	public MutationResult login(@Argument LoginInput input) {
+		log.info("Login mutation called for username: {}", input.getUsername());
+		AuthPayload response = authService.login(input);
+		log.info("Login successful for username: {}", input.getUsername());
 		return response;
 	}
 

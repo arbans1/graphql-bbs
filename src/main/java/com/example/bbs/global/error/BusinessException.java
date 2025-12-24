@@ -51,6 +51,16 @@ public abstract class BusinessException extends RuntimeException {
 	}
 
 	/**
+	 * 인증되지 않은 사용자 또는 인증 실패 (HTTP 401 대응)
+	 * 스키마의 AuthenticationError 타입과 매핑
+	 */
+	public static class AuthenticationException extends BusinessException {
+		public AuthenticationException(String message) {
+			super(ErrorCode.UNAUTHENTICATED, message);
+		}
+	}
+
+	/**
 	 * 권한이 없는 경우 (HTTP 403 대응)
 	 * 스키마의 ForbiddenError 타입과 매핑
 	 */

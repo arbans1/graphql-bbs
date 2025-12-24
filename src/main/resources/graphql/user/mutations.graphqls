@@ -25,7 +25,7 @@ type AuthMutation {
 
 union RegisterPayload = AuthPayload | UserInputError
 
-union LoginPayload = AuthPayload | AuthenticationError
+union LoginPayload = AuthPayload | AuthenticationError | ForbiddenError
 
 union LogoutPayload = LogoutSuccess | AuthenticationError
 
