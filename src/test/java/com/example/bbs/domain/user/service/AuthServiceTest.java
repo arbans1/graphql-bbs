@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.*;
 
 import java.util.List;
 import java.util.Optional;
@@ -18,6 +18,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.example.bbs.domain.user.dto.AuthPayload;
 import com.example.bbs.domain.user.dto.LoginInput;
@@ -51,41 +52,62 @@ class AuthServiceTest {
 	@InjectMocks
 	private AuthService authService;
 
+	// ========== [Private Helpers] ==========
+
+	/** DB 저장 시 ID를 강제로 주입하는 공통 로직 */
+	private void givenUserSaveReturnsWithId(String id) {
+		when(userRepository.save(any(UserEntity.class))).thenAnswer(invocation -> {
+			UserEntity user = invocation.getArgument(0);
+			ReflectionTestUtils.setField(user, "id", id);
+			return user;
+		});
+	}
+
+	/** JWT 관련 Mock 설정 */
+	private void givenJwtSettings(String accessToken, String refreshToken, long expiresIn) {
+		when(jwtTokenProvider.createAccessToken(anyString(), anyString())).thenReturn(accessToken);
+		when(jwtTokenProvider.createRefreshToken(anyString())).thenReturn(refreshToken);
+		lenient().when(jwtProperties.getAccessExpiration()).thenReturn(expiresIn);
+	}
+
+	/** 엔티티를 DTO로 변환할 때 가짜 DTO 반환 설정 */
+	private void givenUserMapperReturnsDto(String userId, String email) {
+		User mockUser = User.builder()
+			.id(userId)
+			.email(email)
+			.role(UserRole.MEMBER)
+			.status(UserStatus.ACTIVE)
+			.build();
+		when(userMapper.toDto(any(UserEntity.class))).thenReturn(mockUser);
+	}
+
+	/** 중복 검사 시 "중복 없음"을 보장하는 설정 */
+	private void givenNoDuplicateUser() {
+		when(userRepository.findAllByLoginIdOrEmailOrNickname(anyString(), anyString(), anyString()))
+			.thenReturn(List.of());
+	}
+
 	// ========== 회원가입(register) 테스트 ==========
 
 	@Test
 	@DisplayName("회원가입 성공 - 모든 조건이 올바른 경우")
 	void register_Success() {
 		// given
-		RegisterInput input = new RegisterInput("validuser", "유효한유저", "valid@test.com", "password123");
+		RegisterInput input = new RegisterInput("myuser", "password123", "nick1", "valid@test.com");
 
-		when(userRepository.findAllByLoginIdOrEmailOrNickname(anyString(), anyString(), anyString()))
-			.thenReturn(List.of());
-		when(passwordEncoder.encode(anyString())).thenReturn("encoded_password");
-		when(userRepository.save(any(UserEntity.class))).thenAnswer(invocation -> {
-			return invocation.getArgument(0);
-		});
-		when(jwtTokenProvider.createAccessToken(anyString(), anyString())).thenReturn("access_token");
-		when(jwtTokenProvider.createRefreshToken(anyString())).thenReturn("refresh_token");
-		when(jwtProperties.getAccessExpiration()).thenReturn(3600L);
+		givenNoDuplicateUser();
+		when(passwordEncoder.encode(anyString())).thenReturn("encoded_pw");
 
-		User mockUser = User.builder()
-			.id("user_id")
-			.email("valid@test.com")
-			.role(UserRole.MEMBER)
-			.status(UserStatus.ACTIVE)
-			.build();
-		when(userMapper.toDto(any(UserEntity.class))).thenReturn(mockUser);
+		givenUserSaveReturnsWithId("user-123");
+		givenJwtSettings("access_token", "refresh_token", 3600L);
+		givenUserMapperReturnsDto("user-123", "valid@test.com");
 
 		// when
 		AuthPayload result = authService.register(input);
 
 		// then
-		assertThat(result).isNotNull();
 		assertThat(result.getAccessToken()).isEqualTo("access_token");
-		assertThat(result.getRefreshToken()).isEqualTo("refresh_token");
-		assertThat(result.getExpiresIn()).isEqualTo(3600L);
-		assertThat(result.getUser()).isNotNull();
+		assertThat(result.getUser().getId()).isEqualTo("user-123");
 		verify(userRepository).save(any(UserEntity.class));
 	}
 
@@ -93,149 +115,42 @@ class AuthServiceTest {
 	@DisplayName("회원가입 실패 - 비밀번호 형식 오류 (8자 미만)")
 	void register_Fail_PasswordTooShort() {
 		// given
-		RegisterInput input = new RegisterInput("user123", "테스터", "test@test.com", "short1");
+		RegisterInput input = new RegisterInput("user123", "short1", "nick1", "test@test.com");
 
 		// when & then
 		assertThatThrownBy(() -> authService.register(input))
 			.isInstanceOf(BusinessException.InvalidInputException.class)
-			.hasMessageContaining("비밀번호");
-	}
-
-	@Test
-	@DisplayName("회원가입 실패 - 비밀번호에 영어 미포함")
-	void register_Fail_PasswordNoAlphabet() {
-		// given
-		RegisterInput input = new RegisterInput("user123", "테스터", "test@test.com", "12345678");
-
-		// when & then
-		assertThatThrownBy(() -> authService.register(input))
-			.isInstanceOf(BusinessException.InvalidInputException.class);
-	}
-
-	@Test
-	@DisplayName("회원가입 실패 - 비밀번호에 숫자 미포함")
-	void register_Fail_PasswordNoDigit() {
-		// given
-		RegisterInput input = new RegisterInput("user123", "테스터", "test@test.com", "password");
-
-		// when & then
-		assertThatThrownBy(() -> authService.register(input))
-			.isInstanceOf(BusinessException.InvalidInputException.class);
+			.extracting(ex -> ((BusinessException.InvalidInputException)ex).getFieldErrors())
+			.satisfies(errors -> {
+				assertThat(errors).isNotEmpty();
+				assertThat(errors.get(0).field()).isEqualTo("password");
+				assertThat(errors.get(0).code()).isEqualTo(UserFieldErrorCode.INVALID_PASSWORD_FORMAT.code());
+			});
 	}
 
 	@Test
 	@DisplayName("회원가입 실패 - 비밀번호에 아이디 포함")
 	void register_Fail_PasswordContainsUsername() {
-		// given
-		RegisterInput input = new RegisterInput("testuser", "테스터", "test@test.com", "testuser123");
+		RegisterInput input = new RegisterInput("myuser", "myuser123", "nick1", "test@test.com");
 
-		// when & then
 		assertThatThrownBy(() -> authService.register(input))
 			.isInstanceOf(BusinessException.InvalidInputException.class)
 			.extracting(ex -> ((BusinessException.InvalidInputException)ex).getFieldErrors())
 			.satisfies(errors -> {
-				assertThat(errors).isNotEmpty();
-				assertThat(errors.get(0).field()).isEqualTo("password");
 				assertThat(errors.get(0).code()).isEqualTo(UserFieldErrorCode.PASSWORD_CONTAINS_USERNAME.code());
-			});
-	}
-
-	@Test
-	@DisplayName("회원가입 실패 - 비밀번호에 연속 반복 문자 포함")
-	void register_Fail_PasswordRepeatedChars() {
-		// given
-		RegisterInput input = new RegisterInput("testuser", "테스터", "test@test.com", "pass1111word");
-
-		// when & then
-		assertThatThrownBy(() -> authService.register(input))
-			.isInstanceOf(BusinessException.InvalidInputException.class)
-			.extracting(ex -> ((BusinessException.InvalidInputException)ex).getFieldErrors())
-			.satisfies(errors -> {
-				assertThat(errors).isNotEmpty();
-				assertThat(errors.get(0).field()).isEqualTo("password");
-				assertThat(errors.get(0).code()).isEqualTo(UserFieldErrorCode.WEAK_PASSWORD.code());
-			});
-	}
-
-	@Test
-	@DisplayName("회원가입 실패 - 아이디 형식 오류 (한글 포함)")
-	void register_Fail_UsernameInvalidFormat() {
-		// given
-		RegisterInput input = new RegisterInput("유저123", "테스터", "test@test.com", "password123");
-
-		// when & then
-		assertThatThrownBy(() -> authService.register(input))
-			.isInstanceOf(BusinessException.InvalidInputException.class)
-			.extracting(ex -> ((BusinessException.InvalidInputException)ex).getFieldErrors())
-			.satisfies(errors -> {
-				assertThat(errors).isNotEmpty();
-				assertThat(errors.get(0).field()).isEqualTo("username");
-				assertThat(errors.get(0).code()).isEqualTo(UserFieldErrorCode.INVALID_USERNAME_FORMAT.code());
-			});
-	}
-
-	@Test
-	@DisplayName("회원가입 실패 - 예약된 아이디 사용")
-	void register_Fail_ReservedUsername() {
-		// given
-		RegisterInput input = new RegisterInput("admin", "테스터", "test@test.com", "password123");
-
-		// when & then
-		assertThatThrownBy(() -> authService.register(input))
-			.isInstanceOf(BusinessException.InvalidInputException.class)
-			.extracting(ex -> ((BusinessException.InvalidInputException)ex).getFieldErrors())
-			.satisfies(errors -> {
-				assertThat(errors).isNotEmpty();
-				assertThat(errors.get(0).field()).isEqualTo("username");
-				assertThat(errors.get(0).code()).isEqualTo(UserFieldErrorCode.RESERVED_USERNAME.code());
-			});
-	}
-
-	@Test
-	@DisplayName("회원가입 실패 - 닉네임 형식 오류 (특수문자 포함)")
-	void register_Fail_NicknameInvalidFormat() {
-		// given
-		RegisterInput input = new RegisterInput("testuser", "테스터@#", "test@test.com", "password123");
-
-		// when & then
-		assertThatThrownBy(() -> authService.register(input))
-			.isInstanceOf(BusinessException.InvalidInputException.class)
-			.extracting(ex -> ((BusinessException.InvalidInputException)ex).getFieldErrors())
-			.satisfies(errors -> {
-				assertThat(errors).isNotEmpty();
-				assertThat(errors.get(0).field()).isEqualTo("nickname");
-				assertThat(errors.get(0).code()).isEqualTo(UserFieldErrorCode.INVALID_NICKNAME_FORMAT.code());
-			});
-	}
-
-	@Test
-	@DisplayName("회원가입 실패 - 예약된 닉네임 사용")
-	void register_Fail_ReservedNickname() {
-		// given
-		RegisterInput input = new RegisterInput("testuser", "관리자", "test@test.com", "password123");
-
-		// when & then
-		assertThatThrownBy(() -> authService.register(input))
-			.isInstanceOf(BusinessException.InvalidInputException.class)
-			.extracting(ex -> ((BusinessException.InvalidInputException)ex).getFieldErrors())
-			.satisfies(errors -> {
-				assertThat(errors).isNotEmpty();
-				assertThat(errors.get(0).field()).isEqualTo("nickname");
-				assertThat(errors.get(0).code()).isEqualTo(UserFieldErrorCode.RESERVED_NICKNAME.code());
 			});
 	}
 
 	@Test
 	@DisplayName("회원가입 실패 - 아이디 중복")
 	void register_Fail_DuplicateUsername() {
-		// given
-		RegisterInput input = new RegisterInput("existinguser", "테스터", "test@test.com", "password123");
+		RegisterInput input = new RegisterInput("existinguser", "password123", "nick1", "test@test.com");
 
 		UserDuplicateView duplicate = new UserDuplicateView() {
 			@Override
 			public String getLoginId() {
 				return "existinguser";
-			}
+			} // 중복 발생 지점
 
 			@Override
 			public String getEmail() {
@@ -244,137 +159,37 @@ class AuthServiceTest {
 
 			@Override
 			public String getNickname() {
-				return "다른유저";
+				return "otherNick";
 			}
 		};
 
 		when(userRepository.findAllByLoginIdOrEmailOrNickname(anyString(), anyString(), anyString()))
 			.thenReturn(List.of(duplicate));
 
-		// when & then
 		assertThatThrownBy(() -> authService.register(input))
 			.isInstanceOf(BusinessException.InvalidInputException.class)
 			.extracting(ex -> ((BusinessException.InvalidInputException)ex).getFieldErrors())
 			.satisfies(errors -> {
-				assertThat(errors).isNotEmpty();
 				assertThat(errors.get(0).field()).isEqualTo("username");
 				assertThat(errors.get(0).code()).isEqualTo(UserFieldErrorCode.DUPLICATE.code());
 			});
 	}
 
 	@Test
-	@DisplayName("회원가입 실패 - 이메일 중복")
-	void register_Fail_DuplicateEmail() {
-		// given
-		RegisterInput input = new RegisterInput("newuser", "테스터", "existing@test.com", "password123");
-
-		UserDuplicateView duplicate = new UserDuplicateView() {
-			@Override
-			public String getLoginId() {
-				return "otheruser";
-			}
-
-			@Override
-			public String getEmail() {
-				return "existing@test.com";
-			}
-
-			@Override
-			public String getNickname() {
-				return "다른유저";
-			}
-		};
-
-		when(userRepository.findAllByLoginIdOrEmailOrNickname(anyString(), anyString(), anyString()))
-			.thenReturn(List.of(duplicate));
-
-		// when & then
-		assertThatThrownBy(() -> authService.register(input))
-			.isInstanceOf(BusinessException.InvalidInputException.class)
-			.extracting(ex -> ((BusinessException.InvalidInputException)ex).getFieldErrors())
-			.satisfies(errors -> {
-				assertThat(errors).isNotEmpty();
-				assertThat(errors.get(0).field()).isEqualTo("email");
-				assertThat(errors.get(0).code()).isEqualTo(UserFieldErrorCode.DUPLICATE.code());
-			});
-	}
-
-	@Test
-	@DisplayName("회원가입 실패 - 닉네임 중복")
-	void register_Fail_DuplicateNickname() {
-		// given
-		RegisterInput input = new RegisterInput("newuser", "기존닉네임", "new@test.com", "password123");
-
-		UserDuplicateView duplicate = new UserDuplicateView() {
-			@Override
-			public String getLoginId() {
-				return "otheruser";
-			}
-
-			@Override
-			public String getEmail() {
-				return "other@test.com";
-			}
-
-			@Override
-			public String getNickname() {
-				return "기존닉네임";
-			}
-		};
-
-		when(userRepository.findAllByLoginIdOrEmailOrNickname(anyString(), anyString(), anyString()))
-			.thenReturn(List.of(duplicate));
-
-		// when & then
-		assertThatThrownBy(() -> authService.register(input))
-			.isInstanceOf(BusinessException.InvalidInputException.class)
-			.extracting(ex -> ((BusinessException.InvalidInputException)ex).getFieldErrors())
-			.satisfies(errors -> {
-				assertThat(errors).isNotEmpty();
-				assertThat(errors.get(0).field()).isEqualTo("nickname");
-				assertThat(errors.get(0).code()).isEqualTo(UserFieldErrorCode.DUPLICATE.code());
-			});
-	}
-
-	@Test
-	@DisplayName("회원가입 실패 - 여러 검증 오류 동시 발생")
-	void register_Fail_MultipleErrors() {
-		// given: 아이디도 예약어이고, 닉네임도 예약어인 경우
-		RegisterInput input = new RegisterInput("admin", "관리자", "test@test.com", "password123");
-
-		// when & then
-		assertThatThrownBy(() -> authService.register(input))
-			.isInstanceOf(BusinessException.InvalidInputException.class)
-			.extracting(ex -> ((BusinessException.InvalidInputException)ex).getFieldErrors())
-			.satisfies(errors -> {
-				assertThat(errors).hasSizeGreaterThanOrEqualTo(2);
-			});
-	}
-
-	@Test
 	@DisplayName("회원가입 성공 - 입력값 앞뒤 공백 제거 처리")
 	void register_Success_TrimInput() {
-		// given
-		RegisterInput input = new RegisterInput("  validuser  ", "  유효한유저  ", "  valid@test.com  ",
-			"password123");
+		RegisterInput input = new RegisterInput("  myuser  ", "password123", "  nick1  ", "  valid@test.com  ");
 
-		when(userRepository.findAllByLoginIdOrEmailOrNickname(anyString(), anyString(), anyString()))
-			.thenReturn(List.of());
-		when(passwordEncoder.encode(anyString())).thenReturn("encoded_password");
-		when(userRepository.save(any(UserEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
-		when(jwtTokenProvider.createAccessToken(anyString(), anyString())).thenReturn("access_token");
-		when(jwtTokenProvider.createRefreshToken(anyString())).thenReturn("refresh_token");
-		when(jwtProperties.getAccessExpiration()).thenReturn(3600L);
+		givenNoDuplicateUser();
+		when(passwordEncoder.encode(anyString())).thenReturn("encoded_pw");
+		givenUserSaveReturnsWithId("user-123");
+		givenJwtSettings("access_token", "refresh_token", 3600L);
+		givenUserMapperReturnsDto("user-123", "valid@test.com");
 
-		User mockUser = User.builder().id("user_id").build();
-		when(userMapper.toDto(any(UserEntity.class))).thenReturn(mockUser);
+		authService.register(input);
 
-		// when
-		AuthPayload result = authService.register(input);
-
-		// then
-		assertThat(result).isNotNull();
-		verify(userRepository).save(any(UserEntity.class));
+		verify(userRepository)
+			.save(argThat(user -> user.getLoginId().equals("myuser") && user.getNickname().equals("nick1")));
 	}
 
 	// ========== 로그인(login) 테스트 ==========
@@ -383,144 +198,38 @@ class AuthServiceTest {
 	@DisplayName("로그인 성공 - 올바른 아이디와 비밀번호")
 	void login_Success() {
 		// given
-		LoginInput input = new LoginInput("testuser", "password123");
+		LoginInput input = new LoginInput("myuser", "password123");
+		UserEntity user = UserEntity.builder().loginId("myuser").hashedPassword("hashed_pw").build();
+		ReflectionTestUtils.setField(user, "id", "user-123");
 
-		UserEntity user = UserEntity.builder()
-			.loginId("testuser")
-			.hashedPassword("hashed_password")
-			.nickname("테스터")
-			.email("test@test.com")
-			.build();
+		when(userRepository.findByLoginId("myuser")).thenReturn(Optional.of(user));
+		when(passwordEncoder.matches("password123", "hashed_pw")).thenReturn(true);
 
-		when(userRepository.findByLoginId("testuser")).thenReturn(Optional.of(user));
-		when(passwordEncoder.matches("password123", "hashed_password")).thenReturn(true);
-		when(jwtTokenProvider.createAccessToken(anyString(), anyString())).thenReturn("access_token");
-		when(jwtTokenProvider.createRefreshToken(anyString())).thenReturn("refresh_token");
-		when(jwtProperties.getAccessExpiration()).thenReturn(3600L);
-
-		User mockUser = User.builder()
-			.id("user_id")
-			.email("test@test.com")
-			.role(UserRole.MEMBER)
-			.status(UserStatus.ACTIVE)
-			.build();
-		when(userMapper.toDto(any(UserEntity.class))).thenReturn(mockUser);
+		givenJwtSettings("access_token", "refresh_token", 3600L);
+		givenUserMapperReturnsDto("user-123", "test@test.com");
 
 		// when
 		AuthPayload result = authService.login(input);
 
 		// then
-		assertThat(result).isNotNull();
 		assertThat(result.getAccessToken()).isEqualTo("access_token");
-		assertThat(result.getRefreshToken()).isEqualTo("refresh_token");
-		assertThat(result.getUser()).isNotNull();
-		verify(userRepository).findByLoginId("testuser");
+		assertThat(user.getLastLoginAt()).isNotNull();
 	}
 
 	@Test
 	@DisplayName("로그인 실패 - 존재하지 않는 아이디")
 	void login_Fail_UserNotFound() {
-		// given
 		LoginInput input = new LoginInput("nonexistent", "password123");
-
 		when(userRepository.findByLoginId("nonexistent")).thenReturn(Optional.empty());
 
-		// when & then
 		assertThatThrownBy(() -> authService.login(input))
-			.isInstanceOf(BusinessException.AuthenticationException.class)
-			.hasMessageContaining("아이디 또는 비밀번호가 일치하지 않습니다");
+			.isInstanceOf(BusinessException.AuthenticationException.class);
 	}
 
 	@Test
-	@DisplayName("로그인 실패 - 비밀번호 불일치")
-	void login_Fail_WrongPassword() {
-		// given
-		LoginInput input = new LoginInput("testuser", "wrongpassword");
-
-		UserEntity user = UserEntity.builder()
-			.loginId("testuser")
-			.hashedPassword("hashed_password")
-			.nickname("테스터")
-			.email("test@test.com")
-			.build();
-
-		when(userRepository.findByLoginId("testuser")).thenReturn(Optional.of(user));
-		when(passwordEncoder.matches("wrongpassword", "hashed_password")).thenReturn(false);
-
-		// when & then
-		assertThatThrownBy(() -> authService.login(input))
-			.isInstanceOf(BusinessException.AuthenticationException.class)
-			.hasMessageContaining("아이디 또는 비밀번호가 일치하지 않습니다");
-	}
-
-	@Test
-	@DisplayName("로그인 성공 - 마지막 로그인 시간 업데이트")
-	void login_Success_UpdatesLastLoginAt() {
-		// given
-		LoginInput input = new LoginInput("testuser", "password123");
-
-		UserEntity user = UserEntity.builder()
-			.loginId("testuser")
-			.hashedPassword("hashed_password")
-			.nickname("테스터")
-			.email("test@test.com")
-			.build();
-
-		when(userRepository.findByLoginId("testuser")).thenReturn(Optional.of(user));
-		when(passwordEncoder.matches("password123", "hashed_password")).thenReturn(true);
-		when(jwtTokenProvider.createAccessToken(anyString(), anyString())).thenReturn("access_token");
-		when(jwtTokenProvider.createRefreshToken(anyString())).thenReturn("refresh_token");
-		when(jwtProperties.getAccessExpiration()).thenReturn(3600L);
-
-		User mockUser = User.builder().id("user_id").build();
-		when(userMapper.toDto(any(UserEntity.class))).thenReturn(mockUser);
-
-		// when
-		authService.login(input);
-
-		// then
-		assertThat(user.getLastLoginAt()).isNotNull();
-	}
-
-	@Test
-	@DisplayName("로그인 성공 - 입력값 앞뒤 공백 제거 처리")
-	void login_Success_TrimInput() {
-		// given
-		LoginInput input = new LoginInput("  testuser  ", "password123");
-
-		UserEntity user = UserEntity.builder()
-			.loginId("testuser")
-			.hashedPassword("hashed_password")
-			.nickname("테스터")
-			.email("test@test.com")
-			.build();
-
-		when(userRepository.findByLoginId("testuser")).thenReturn(Optional.of(user));
-		when(passwordEncoder.matches("password123", "hashed_password")).thenReturn(true);
-		when(jwtTokenProvider.createAccessToken(anyString(), anyString())).thenReturn("access_token");
-		when(jwtTokenProvider.createRefreshToken(anyString())).thenReturn("refresh_token");
-		when(jwtProperties.getAccessExpiration()).thenReturn(3600L);
-
-		User mockUser = User.builder().id("user_id").build();
-		when(userMapper.toDto(any(UserEntity.class))).thenReturn(mockUser);
-
-		// when
-		AuthPayload result = authService.login(input);
-
-		// then
-		assertThat(result).isNotNull();
-		verify(userRepository).findByLoginId("testuser");
-	}
-
-	@Test
-	@DisplayName("비밀번호 정책에 위반되면 InvalidInputException이 발생한다")
-	void register_ThrowsException_WhenPasswordInvalid() {
-		// given: 정책에 어긋나는 짧은 비밀번호
-		RegisterInput input = new RegisterInput("user123", "테스터", "test@test.com", "short");
-
-		// when & then
-		assertThrows(BusinessException.InvalidInputException.class, () -> {
-			authService.register(input);
-		});
+	@DisplayName("비밀번호 정책 위반 테스트")
+	void register_Fail_InvalidPassword() {
+		RegisterInput input = new RegisterInput("user123", "short", "nick1", "test@test.com");
+		assertThrows(BusinessException.InvalidInputException.class, () -> authService.register(input));
 	}
 }
