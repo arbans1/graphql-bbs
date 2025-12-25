@@ -24,4 +24,10 @@ public class JwtProperties {
 	/** 리프레시 토큰 만료 시간 (밀리초) */
 	private final long refreshExpiration;
 
+	/** 쿠키에 저장할 리프레시 토큰 이름 */
+	public static final String REFRESH_TOKEN_COOKIE_NAME = "refresh_token";
+
+	/** GraphQL 컨텍스트에 저장할 리프레시 토큰 키 */
+	public static record RefreshTokenCookie(String value) {
+	}
 }

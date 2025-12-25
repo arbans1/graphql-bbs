@@ -14,6 +14,7 @@ import org.springframework.boot.test.autoconfigure.graphql.GraphQlTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import com.example.bbs.domain.user.dto.AuthPayload;
+import com.example.bbs.domain.user.dto.AuthTokens;
 import com.example.bbs.domain.user.dto.LoginInput;
 import com.example.bbs.domain.user.dto.RegisterInput;
 import com.example.bbs.domain.user.dto.User;
@@ -23,6 +24,7 @@ import com.example.bbs.domain.user.error.UserFieldErrorCode;
 import com.example.bbs.domain.user.service.AuthService;
 import com.example.bbs.global.error.BusinessException;
 import com.example.bbs.global.error.FieldError;
+import com.example.bbs.global.security.JwtProperties;
 import com.example.bbs.support.GraphQlTestBase;
 
 @GraphQlTest(AuthMutationController.class)
@@ -30,6 +32,9 @@ class AuthMutationControllerTest extends GraphQlTestBase {
 
 	@MockitoBean
 	private AuthService authService;
+
+	@MockitoBean
+	private JwtProperties jwtProperties;
 
 	@Nested
 	@DisplayName("회원가입(register) 테스트")
@@ -39,19 +44,19 @@ class AuthMutationControllerTest extends GraphQlTestBase {
 		@DisplayName("회원가입 성공 - 올바른 입력값")
 		void register_Success() {
 			// given
-			AuthPayload mockPayload = AuthPayload.builder()
-				.accessToken("access-token")
-				.refreshToken("refresh-token")
-				.expiresIn(3600L)
-				.user(User.builder()
-					.id("user-id")
-					.email("test@test.com")
-					.role(UserRole.MEMBER)
-					.status(UserStatus.ACTIVE)
-					.build())
+			given(jwtProperties.getRefreshExpiration()).willReturn(3_600_000L);
+			User mockUser = User.builder()
+				.id("user-id")
+				.email("test@test.com")
+				.role(UserRole.MEMBER)
+				.status(UserStatus.ACTIVE)
 				.build();
 
-			given(authService.register(any(RegisterInput.class))).willReturn(mockPayload);
+			AuthPayload mockPayload = new AuthPayload("access-token", mockUser, 3600L);
+
+			AuthTokens mockTokens = new AuthTokens(mockPayload, "refresh-token");
+
+			given(authService.register(any(RegisterInput.class))).willReturn(mockTokens);
 
 			String document = """
 				mutation Register($input: RegisterInput!) {
@@ -59,7 +64,6 @@ class AuthMutationControllerTest extends GraphQlTestBase {
 						register(input: $input) {
 							... on AuthPayload {
 								accessToken
-								refreshToken
 								expiresIn
 								user {
 									id
@@ -83,7 +87,6 @@ class AuthMutationControllerTest extends GraphQlTestBase {
 				.execute()
 				.errors().verify()
 				.path("auth.register.accessToken").entity(String.class).isEqualTo("access-token")
-				.path("auth.register.refreshToken").entity(String.class).isEqualTo("refresh-token")
 				.path("auth.register.expiresIn").entity(Long.class).isEqualTo(3600L)
 				.path("auth.register.user.id").entity(String.class).isEqualTo("user-id")
 				.path("auth.register.user.email").entity(String.class).isEqualTo("test@test.com")
@@ -262,19 +265,18 @@ class AuthMutationControllerTest extends GraphQlTestBase {
 		@DisplayName("로그인 성공 - 올바른 아이디와 비밀번호")
 		void login_Success() {
 			// given
-			AuthPayload mockPayload = AuthPayload.builder()
-				.accessToken("access-token")
-				.refreshToken("refresh-token")
-				.expiresIn(3600L)
-				.user(User.builder()
-					.id("user-id")
-					.email("test@test.com")
-					.role(UserRole.MEMBER)
-					.status(UserStatus.ACTIVE)
-					.build())
+			given(jwtProperties.getRefreshExpiration()).willReturn(3_600_000L);
+			User mockUser = User.builder()
+				.id("user-id")
+				.email("test@test.com")
+				.role(UserRole.MEMBER)
+				.status(UserStatus.ACTIVE)
 				.build();
 
-			given(authService.login(any(LoginInput.class))).willReturn(mockPayload);
+			AuthPayload mockPayload = new AuthPayload("access-token", mockUser, 3600L);
+			AuthTokens mockTokens = new AuthTokens(mockPayload, "refresh-token");
+
+			given(authService.login(any(LoginInput.class))).willReturn(mockTokens);
 
 			String document = """
 				mutation Login($input: LoginInput!) {
@@ -282,7 +284,6 @@ class AuthMutationControllerTest extends GraphQlTestBase {
 						login(input: $input) {
 							... on AuthPayload {
 								accessToken
-								refreshToken
 								expiresIn
 								user {
 									id
@@ -304,7 +305,6 @@ class AuthMutationControllerTest extends GraphQlTestBase {
 				.execute()
 				.errors().verify()
 				.path("auth.login.accessToken").entity(String.class).isEqualTo("access-token")
-				.path("auth.login.refreshToken").entity(String.class).isEqualTo("refresh-token")
 				.path("auth.login.user.id").entity(String.class).isEqualTo("user-id")
 				.path("auth.login.user.email").entity(String.class).isEqualTo("test@test.com");
 		}

@@ -6,6 +6,8 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.ReportingPolicy;
 
+import com.example.bbs.domain.user.dto.AuthPayload;
+import com.example.bbs.domain.user.dto.AuthTokens;
 import com.example.bbs.domain.user.dto.User;
 import com.example.bbs.domain.user.entity.UserEntity;
 
@@ -17,4 +19,9 @@ public interface UserMapper {
 	User toDto(UserEntity entity);
 
 	List<User> toDtoList(List<UserEntity> entities);
+
+	@Mapping(target = "user", source = "userEntity")
+	AuthPayload toAuthPayload(UserEntity userEntity, String accessToken, long expiresIn);
+
+	AuthTokens toAuthTokens(AuthPayload payload, String refreshToken);
 }

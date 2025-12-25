@@ -1,6 +1,7 @@
 package com.example.bbs.global.security;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
 import java.util.List;
@@ -8,6 +9,7 @@ import java.util.List;
 import javax.crypto.SecretKey;
 
 import org.jspecify.annotations.NullMarked;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -145,5 +147,22 @@ public class JwtTokenProvider {
 		String role = claims.get("role", String.class); // 페이로드에 저장했던 role
 		List<SimpleGrantedAuthority> authorities = List.of(new SimpleGrantedAuthority(role));
 		return new UsernamePasswordAuthenticationToken(userId, null, authorities);
+	}
+
+	/**
+	 * 리프레시 토큰 쿠키 생성
+	 *
+	 * @param properties JWT 설정 정보
+	 * @param refreshToken 리프레시 토큰 문자열
+	 * @return ResponseCookie 객체
+	 */
+	public ResponseCookie createRefreshTokenCookie(String refreshToken) {
+		return ResponseCookie.from(JwtProperties.REFRESH_TOKEN_COOKIE_NAME, refreshToken)
+			.httpOnly(true)
+			.secure(true)
+			.path("/")
+			.maxAge(Duration.ofMillis(this.refreshExpiration))
+			.sameSite("Lax")
+			.build();
 	}
 }

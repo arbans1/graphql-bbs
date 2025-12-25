@@ -4,9 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.util.List;
 import java.util.Optional;
@@ -21,6 +24,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import com.example.bbs.domain.user.dto.AuthPayload;
+import com.example.bbs.domain.user.dto.AuthTokens;
 import com.example.bbs.domain.user.dto.LoginInput;
 import com.example.bbs.domain.user.dto.RegisterInput;
 import com.example.bbs.domain.user.dto.User;
@@ -70,21 +74,26 @@ class AuthServiceTest {
 		lenient().when(jwtProperties.getAccessExpiration()).thenReturn(expiresIn);
 	}
 
-	/** 엔티티를 DTO로 변환할 때 가짜 DTO 반환 설정 */
-	private void givenUserMapperReturnsDto(String userId, String email) {
+	/** 중복 검사 시 "중복 없음"을 보장하는 설정 */
+	private void givenNoDuplicateUser() {
+		when(userRepository.findAllByLoginIdOrEmailOrNickname(anyString(), anyString(), anyString()))
+			.thenReturn(List.of());
+	}
+
+	/** JWT 토큰 생성 시 가짜 토큰 반환 설정 */
+	private void givenUserMapperReturnsAuthTokens(String userId, String email) {
 		User mockUser = User.builder()
 			.id(userId)
 			.email(email)
 			.role(UserRole.MEMBER)
 			.status(UserStatus.ACTIVE)
 			.build();
-		when(userMapper.toDto(any(UserEntity.class))).thenReturn(mockUser);
-	}
 
-	/** 중복 검사 시 "중복 없음"을 보장하는 설정 */
-	private void givenNoDuplicateUser() {
-		when(userRepository.findAllByLoginIdOrEmailOrNickname(anyString(), anyString(), anyString()))
-			.thenReturn(List.of());
+		AuthPayload mockPayload = new AuthPayload("access_token", mockUser, 3600L);
+		AuthTokens mockTokens = new AuthTokens(mockPayload, "refresh_token");
+
+		when(userMapper.toAuthPayload(any(), anyString(), anyLong())).thenReturn(mockPayload);
+		when(userMapper.toAuthTokens(any(), anyString())).thenReturn(mockTokens);
 	}
 
 	// ========== 회원가입(register) 테스트 ==========
@@ -100,14 +109,15 @@ class AuthServiceTest {
 
 		givenUserSaveReturnsWithId("user-123");
 		givenJwtSettings("access_token", "refresh_token", 3600L);
-		givenUserMapperReturnsDto("user-123", "valid@test.com");
+		givenUserMapperReturnsAuthTokens("user-123", "valid@test.com");
 
 		// when
-		AuthPayload result = authService.register(input);
+		AuthTokens tokens = authService.register(input);
+		AuthPayload result = tokens.payload();
 
 		// then
-		assertThat(result.getAccessToken()).isEqualTo("access_token");
-		assertThat(result.getUser().getId()).isEqualTo("user-123");
+		assertThat(result.accessToken()).isEqualTo("access_token");
+		assertThat(result.user().getId()).isEqualTo("user-123");
 		verify(userRepository).save(any(UserEntity.class));
 	}
 
@@ -184,7 +194,7 @@ class AuthServiceTest {
 		when(passwordEncoder.encode(anyString())).thenReturn("encoded_pw");
 		givenUserSaveReturnsWithId("user-123");
 		givenJwtSettings("access_token", "refresh_token", 3600L);
-		givenUserMapperReturnsDto("user-123", "valid@test.com");
+		givenUserMapperReturnsAuthTokens("user-123", "valid@test.com");
 
 		authService.register(input);
 
@@ -206,13 +216,14 @@ class AuthServiceTest {
 		when(passwordEncoder.matches("password123", "hashed_pw")).thenReturn(true);
 
 		givenJwtSettings("access_token", "refresh_token", 3600L);
-		givenUserMapperReturnsDto("user-123", "test@test.com");
+		givenUserMapperReturnsAuthTokens("user-123", "test@test.com");
 
 		// when
-		AuthPayload result = authService.login(input);
+		AuthTokens tokens = authService.login(input);
+		AuthPayload result = tokens.payload();
 
 		// then
-		assertThat(result.getAccessToken()).isEqualTo("access_token");
+		assertThat(result.accessToken()).isEqualTo("access_token");
 		assertThat(user.getLastLoginAt()).isNotNull();
 	}
 

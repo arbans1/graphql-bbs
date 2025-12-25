@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import com.example.bbs.domain.user.dto.AuthPayload;
+import com.example.bbs.domain.user.dto.AuthTokens;
 import com.example.bbs.domain.user.dto.LoginInput;
 import com.example.bbs.domain.user.dto.RegisterInput;
 import com.example.bbs.domain.user.entity.UserEntity;
@@ -41,7 +42,7 @@ public class AuthService {
 	private final JwtTokenProvider jwtTokenProvider;
 
 	@Transactional
-	public AuthPayload register(RegisterInput input) {
+	public AuthTokens register(RegisterInput input) {
 
 		String username = input.getUsername().trim();
 		String nickname = input.getNickname().trim();
@@ -61,11 +62,11 @@ public class AuthService {
 
 		UserEntity saved = userRepository.save(newUser);
 
-		return createAuthPayload(saved);
+		return createAuthTokens(saved);
 	}
 
 	@Transactional
-	public AuthPayload login(LoginInput input) {
+	public AuthTokens login(LoginInput input) {
 
 		String username = input.getUsername().trim();
 		String password = input.getPassword();
@@ -89,22 +90,19 @@ public class AuthService {
 		// 로그인 성공
 		user.updateLastLoginAt();
 
-		return createAuthPayload(user);
+		return createAuthTokens(user);
 	}
 
 	/**
 	 * JWT 토큰 발급 및 응답 페이로드 생성
 	 */
-	private AuthPayload createAuthPayload(UserEntity user) {
+	private AuthTokens createAuthTokens(UserEntity user) {
 		String accessToken = jwtTokenProvider.createAccessToken(user.getId(), user.getRole().name());
 		String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());
+		long expiresIn = jwtProperties.getAccessExpiration();
 
-		return AuthPayload.builder()
-			.accessToken(accessToken)
-			.refreshToken(refreshToken)
-			.expiresIn(jwtProperties.getAccessExpiration())
-			.user(userMapper.toDto(user))
-			.build();
+		AuthPayload payload = userMapper.toAuthPayload(user, accessToken, expiresIn);
+		return userMapper.toAuthTokens(payload, refreshToken);
 	}
 
 	/**
