@@ -149,7 +149,9 @@ public class JwtTokenProvider {
 			.getPayload();
 		String userId = claims.getSubject();
 		String role = claims.get("role", String.class); // 페이로드에 저장했던 role
-		List<SimpleGrantedAuthority> authorities = List.of(new SimpleGrantedAuthority(role));
+		// 페이로드의 role에 ROLE_ 접두사가 없는 경우 추가함 (Spring Security의 권한 이름 규칙 맞추기 위함)
+		String grantedRole = role.startsWith("ROLE_") ? role : "ROLE_" + role;
+		List<SimpleGrantedAuthority> authorities = List.of(new SimpleGrantedAuthority(grantedRole));
 		return new UsernamePasswordAuthenticationToken(userId, null, authorities);
 	}
 

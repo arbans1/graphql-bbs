@@ -1,10 +1,15 @@
 package com.example.bbs.controller;
 
+import java.util.List;
+
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
 import org.springframework.graphql.data.method.annotation.SchemaMapping;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 
 import graphql.GraphQLContext;
@@ -58,6 +63,7 @@ public class AuthMutationController {
 	@GqlMutation
 	public MutationResult register(@Argument RegisterInput input, GraphQLContext context) {
 		AuthTokens tokens = authService.register(input);
+		setSecurityContext(tokens.payload());
 		// 리프레시 토큰을 컨텍스트에 저장하여 인터셉터에서 쿠키로 변환
 		addRefreshTokenCookie(context, tokens.refreshToken());
 		return tokens.payload();
@@ -76,6 +82,7 @@ public class AuthMutationController {
 	@GqlMutation
 	public MutationResult login(@Argument LoginInput input, GraphQLContext context) {
 		AuthTokens tokens = authService.login(input);
+		setSecurityContext(tokens.payload());
 		// 리프레시 토큰을 컨텍스트에 저장하여 인터셉터에서 쿠키로 변환
 		addRefreshTokenCookie(context, tokens.refreshToken());
 		return tokens.payload();
@@ -94,6 +101,7 @@ public class AuthMutationController {
 	@GqlMutation
 	public LogoutSuccess logout(GraphQLContext context) {
 		LogoutSuccess result = authService.logout();
+		SecurityContextHolder.clearContext();
 		// 리프레시 토큰 쿠키 삭제
 		removeRefreshTokenCookie(context);
 		return result;
@@ -116,6 +124,7 @@ public class AuthMutationController {
 		String refreshToken = getRefreshTokenFromContext(context);
 		// 새로운 액세스 토큰 발급
 		AuthPayload payload = authService.refreshToken(refreshToken);
+		setSecurityContext(payload);
 
 		return payload;
 	}
@@ -161,6 +170,18 @@ public class AuthMutationController {
 		JwtProperties.RefreshTokenCookie cookie = context.get(JwtProperties.RefreshTokenCookie.class);
 		// 쿠키 객체가 있으면 토큰 값 반환, 없으면 null
 		return (cookie != null) ? cookie.value() : null;
+	}
+
+	/**
+	 * SecurityContext에 인증 정보를 수동으로 설정
+	 */
+	private void setSecurityContext(AuthPayload payload) {
+		var user = payload.user();
+		var auth = new UsernamePasswordAuthenticationToken(
+			user.getId(),
+			null,
+			List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name())));
+		SecurityContextHolder.getContext().setAuthentication(auth);
 	}
 
 	public static class AuthMutation {
