@@ -102,10 +102,3 @@ type DeleteSuccess {
   message: String!
   deletedId: ID!
 }
-
-"""
-로그아웃 성공
-"""
-type LogoutSuccess {
-  message: String!
-}

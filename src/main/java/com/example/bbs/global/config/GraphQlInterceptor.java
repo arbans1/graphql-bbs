@@ -36,6 +36,8 @@ public class GraphQlInterceptor implements WebGraphQlInterceptor {
 	/**
 	 * GraphQL 컨텍스트에 저장된 리프레시 토큰 존재 시 응답 헤더에 쿠키 추가
 	 *
+	 * 토큰이 null이면 쿠키 삭제 신호 (Max-Age=0)를 전송
+	 *
 	 * @param response GraphQL 응답 객체
 	 * @return 쿠키가 필요 시 추가된 응답 객체
 	 */
@@ -48,9 +50,13 @@ public class GraphQlInterceptor implements WebGraphQlInterceptor {
 			return response;
 		}
 
-		// 토큰 원문 로그 금지. 쿠키 생성 후 헤더에만 추가
-		ResponseCookie cookie = jwtTokenProvider.createRefreshTokenCookie(refreshTokenCookie.value());
+		// 토큰이 null이면 쿠키 삭제 (Max-Age=0), 토큰이 있으면 쿠키 생성
+		ResponseCookie cookie = (refreshTokenCookie.value() == null)
+			? jwtTokenProvider.createDeleteRefreshTokenCookie()
+			: jwtTokenProvider.createRefreshTokenCookie(refreshTokenCookie.value());
+
 		response.getResponseHeaders().add(HttpHeaders.SET_COOKIE, cookie.toString());
 		return response;
 	}
+
 }

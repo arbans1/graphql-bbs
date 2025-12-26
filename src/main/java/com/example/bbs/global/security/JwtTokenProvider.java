@@ -165,4 +165,18 @@ public class JwtTokenProvider {
 			.sameSite("Lax")
 			.build();
 	}
+
+	/**
+	 * 리프레시 토큰 쿠키 삭제용 쿠키 생성 (Max-Age=0)
+	 * * @return 삭제 신호를 포함한 ResponseCookie
+	 */
+	public ResponseCookie createDeleteRefreshTokenCookie() {
+		return ResponseCookie.from(JwtProperties.REFRESH_TOKEN_COOKIE_NAME, "")
+			.httpOnly(true)
+			.secure(true)
+			.path("/")
+			.maxAge(0) // 즉시 만료
+			.sameSite("Lax")
+			.build();
+	}
 }

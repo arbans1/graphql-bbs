@@ -68,3 +68,10 @@ type MePayload {
   "인증된 사용자 정보"
   user: User!
 }
+
+"""
+로그아웃 성공
+"""
+type LogoutSuccess {
+  message: String!
+}

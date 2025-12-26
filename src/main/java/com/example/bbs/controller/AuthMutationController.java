@@ -12,6 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import com.example.bbs.domain.user.dto.AuthTokens;
 import com.example.bbs.domain.user.dto.LoginInput;
+import com.example.bbs.domain.user.dto.LogoutSuccess;
 import com.example.bbs.domain.user.dto.RegisterInput;
 import com.example.bbs.domain.user.service.AuthService;
 import com.example.bbs.global.aop.GqlMutation;
@@ -82,6 +83,24 @@ public class AuthMutationController {
 	}
 
 	/**
+	 * 로그아웃 처리
+	 *
+	 * 현재 사용자의 인증 정보를 제거하고 리프레시 토큰 쿠키를 삭제.
+	 * 인증 요구: AUTHENTICATED 사용자만 로그아웃 가능
+	 *
+	 * @param context GraphQL 컨텍스트 (쿠키 삭제에 사용)
+	 * @return 로그아웃 성공 응답
+	 */
+	@SchemaMapping(typeName = "AuthMutation", field = "logout")
+	@GqlMutation
+	public LogoutSuccess logout(GraphQLContext context) {
+		LogoutSuccess result = authService.logout();
+		// 리프레시 토큰 쿠키 삭제
+		removeRefreshTokenCookie(context);
+		return result;
+	}
+
+	/**
 	 * 리프레시 토큰을 GraphQL 컨텍스트에 저장
 	 *
 	 * 실제 쿠키 설정은 인터셉터에서 수행. 컨텍스트에 토큰을 보관하여 응답 헤더에 쿠키 추가
@@ -94,6 +113,19 @@ public class AuthMutationController {
 		context.put(JwtProperties.RefreshTokenCookie.class, new JwtProperties.RefreshTokenCookie(refreshToken));
 	}
 
+	/**
+	 * 리프레시 토큰 쿠키 삭제 (클라이언트에서도 삭제)
+	 *
+	 * Max-Age=0으로 설정하여 쿠키 삭제 신호를 보냄. 실제 쿠키 삭제는 인터셉터에서 수행.
+	 *
+	 * @param context GraphQL 컨텍스트
+	 */
+	private void removeRefreshTokenCookie(GraphQLContext context) {
+		// 리프레시 토큰 쿠키 삭제를 위해 null 값 설정
+		context.put(JwtProperties.RefreshTokenCookie.class, new JwtProperties.RefreshTokenCookie(null));
+	}
+
 	public static class AuthMutation {
 	}
+
 }

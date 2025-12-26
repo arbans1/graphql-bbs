@@ -14,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import com.example.bbs.domain.user.dto.AuthPayload;
 import com.example.bbs.domain.user.dto.AuthTokens;
 import com.example.bbs.domain.user.dto.LoginInput;
+import com.example.bbs.domain.user.dto.LogoutSuccess;
 import com.example.bbs.domain.user.dto.RegisterInput;
 import com.example.bbs.domain.user.entity.UserEntity;
 import com.example.bbs.domain.user.enums.UserStatus;
@@ -103,6 +104,18 @@ public class AuthService {
 
 		AuthPayload payload = userMapper.toAuthPayload(user, accessToken, expiresIn);
 		return userMapper.toAuthTokens(payload, refreshToken);
+	}
+
+	/**
+	 * 로그아웃 처리
+	 *
+	 * 현재 인증 정보를 SecurityContext에서 제거하고 로그아웃 성공 메시지 반환.
+	 * 클라이언트는 리프레시 토큰 쿠키를 별도로 삭제해야 합니다.
+	 *
+	 * @return 로그아웃 성공 응답
+	 */
+	public LogoutSuccess logout() {
+		return new LogoutSuccess("로그아웃 되었습니다");
 	}
 
 	/**

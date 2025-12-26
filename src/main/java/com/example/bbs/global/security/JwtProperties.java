@@ -1,6 +1,7 @@
 package com.example.bbs.global.security;
 
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import lombok.AllArgsConstructor;
@@ -28,6 +29,6 @@ public class JwtProperties {
 	public static final String REFRESH_TOKEN_COOKIE_NAME = "refresh_token";
 
 	/** GraphQL 컨텍스트에 저장할 리프레시 토큰 키 */
-	public static record RefreshTokenCookie(String value) {
+	public static record RefreshTokenCookie(@Nullable String value) {
 	}
 }

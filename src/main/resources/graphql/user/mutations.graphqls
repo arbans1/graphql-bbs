@@ -13,7 +13,7 @@ type AuthMutation {
   login(input: LoginInput!): LoginPayload!
 
   "로그아웃"
-  logout: LogoutPayload!
+  logout: LogoutSuccess!
 
   "토큰 리프레시"
   refreshToken: RefreshTokenPayload!
@@ -26,7 +26,5 @@ type AuthMutation {
 union RegisterPayload = AuthPayload | UserInputError
 
 union LoginPayload = AuthPayload | AuthenticationError | ForbiddenError
-
-union LogoutPayload = LogoutSuccess | AuthenticationError
 
 union RefreshTokenPayload = AuthPayload | AuthenticationError

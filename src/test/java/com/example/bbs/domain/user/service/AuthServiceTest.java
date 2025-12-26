@@ -26,6 +26,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import com.example.bbs.domain.user.dto.AuthPayload;
 import com.example.bbs.domain.user.dto.AuthTokens;
 import com.example.bbs.domain.user.dto.LoginInput;
+import com.example.bbs.domain.user.dto.LogoutSuccess;
 import com.example.bbs.domain.user.dto.RegisterInput;
 import com.example.bbs.domain.user.dto.User;
 import com.example.bbs.domain.user.entity.UserEntity;
@@ -242,5 +243,18 @@ class AuthServiceTest {
 	void register_Fail_InvalidPassword() {
 		RegisterInput input = new RegisterInput("user123", "short", "nick1", "test@test.com");
 		assertThrows(BusinessException.InvalidInputException.class, () -> authService.register(input));
+	}
+
+	// ========== 로그아웃(logout) 테스트 ==========
+
+	@Test
+	@DisplayName("로그아웃 성공")
+	void logout_Success() {
+		// when
+		LogoutSuccess result = authService.logout();
+
+		// then
+		assertThat(result).isNotNull();
+		assertThat(result.message()).isEqualTo("로그아웃 되었습니다");
 	}
 }
