@@ -6,8 +6,8 @@
 회원가입 입력
 """
 input RegisterInput {
-  "사용자 ID"
-  userId: String!
+  "사용자 로그인 ID"
+  username: String!
 
   "비밀번호"
   password: String!
@@ -23,8 +23,8 @@ input RegisterInput {
 로그인 입력
 """
 input LoginInput {
-  "사용자 ID"
-  userId: String!
+  "사용자 로그인 ID"
+  username: String!
 
   "비밀번호"
   password: String!

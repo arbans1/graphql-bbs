@@ -28,6 +28,7 @@ configurations {
     compileOnly {
         extendsFrom annotationProcessor
     }
+    mockitoAgent
 }
 
 repositories {
@@ -43,12 +44,19 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-graphql'
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
 
+    // Web Utilities
+    implementation 'com.graphql-java:graphql-java-extended-scalars:24.0'
+    implementation 'io.jsonwebtoken:jjwt-api:0.13.0'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.13.0'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.13.0'
+
     // Database
     runtimeOnly 'org.postgresql:postgresql'
     implementation 'com.querydsl:querydsl-jpa:5.1.0:jakarta'
     annotationProcessor "com.querydsl:querydsl-apt:5.1.0:jakarta"
     annotationProcessor "jakarta.annotation:jakarta.annotation-api"
     annotationProcessor "jakarta.persistence:jakarta.persistence-api"
+    implementation 'io.hypersistence:hypersistence-utils-hibernate-63:3.14.1'
 
     // Null Safety
     errorprone 'com.google.errorprone:error_prone_core:2.31.0'
@@ -56,7 +64,6 @@ dependencies {
     compileOnly 'org.jspecify:jspecify:1.0.0'
 
     // Utilities
-    implementation 'com.graphql-java:graphql-java-extended-scalars:24.0'
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
     implementation 'org.mapstruct:mapstruct:1.6.3'
@@ -68,7 +75,10 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
     testImplementation 'org.springframework.graphql:spring-graphql-test'
+    testImplementation 'org.springframework.boot:spring-boot-starter-webflux'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testRuntimeOnly 'com.h2database:h2'
+    mockitoAgent('org.mockito:mockito-core:5.17.0') { transitive = false }
 }
 
 // ---------------------------------------------------------
@@ -94,6 +104,7 @@ tasks.withType(JavaCompile).configureEach {
 // ---------------------------------------------------------
 tasks.named('test') {
     useJUnitPlatform()
+    jvmArgs("-javaagent:${configurations.mockitoAgent.asPath}")
     finalizedBy jacocoTestReport
 }
 

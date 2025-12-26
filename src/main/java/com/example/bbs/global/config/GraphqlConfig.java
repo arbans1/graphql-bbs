@@ -1,4 +1,4 @@
-package com.example.bbs.config;
+package com.example.bbs.global.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
