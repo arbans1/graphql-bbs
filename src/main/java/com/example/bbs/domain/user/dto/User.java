@@ -7,12 +7,14 @@ import org.jspecify.annotations.Nullable;
 
 import lombok.Builder;
 import lombok.Getter;
+import lombok.ToString;
 
 import com.example.bbs.domain.user.enums.UserRole;
 import com.example.bbs.domain.user.enums.UserStatus;
 
 @Getter
 @Builder
+@ToString(exclude = "profile")
 @NullMarked
 public class User {
 	private String id;

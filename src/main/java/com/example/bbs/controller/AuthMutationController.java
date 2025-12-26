@@ -106,7 +106,7 @@ public class AuthMutationController {
 	 * 리프레시 토큰이 없으면 예외 발생. 토큰 검증은 서비스 레이어에서 수행
 	 *
 	 * @param context GraphQL 컨텍스트 (리프레시 토큰 추출)
-	 * @return 새로운 액세스 토큰을 포함한 인증 페이로드
+	 * @return 새로운 액세스 토큰을 포함한 Mutation 결과
 	 *
 	 */
 	@SchemaMapping(typeName = "AuthMutation", field = "refreshToken")

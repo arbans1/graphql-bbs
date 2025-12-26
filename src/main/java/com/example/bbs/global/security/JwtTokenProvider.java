@@ -156,7 +156,6 @@ public class JwtTokenProvider {
 	/**
 	 * 리프레시 토큰 쿠키 생성
 	 *
-	 * @param properties JWT 설정 정보
 	 * @param refreshToken 리프레시 토큰 문자열
 	 * @return ResponseCookie 객체
 	 */
@@ -172,7 +171,7 @@ public class JwtTokenProvider {
 
 	/**
 	 * 리프레시 토큰 쿠키 삭제용 쿠키 생성 (Max-Age=0)
-	 * * @return 삭제 신호를 포함한 ResponseCookie
+	 * @return 삭제 신호를 포함한 ResponseCookie
 	 */
 	public ResponseCookie createDeleteRefreshTokenCookie() {
 		return ResponseCookie.from(JwtProperties.REFRESH_TOKEN_COOKIE_NAME, "")
