@@ -11,12 +11,13 @@ import lombok.ToString;
 
 import com.example.bbs.domain.user.enums.UserRole;
 import com.example.bbs.domain.user.enums.UserStatus;
+import com.example.bbs.global.common.Ownable;
 
 @Getter
 @Builder
 @ToString(exclude = "profile")
 @NullMarked
-public class User {
+public class User implements Ownable {
 	private String id;
 	private String email;
 	private UserProfile profile;
@@ -25,4 +26,8 @@ public class User {
 	private @Nullable OffsetDateTime lastLoginAt;
 	private UserStatus status;
 
+	@Override
+	public String getOwnerId() {
+		return this.id;
+	}
 }

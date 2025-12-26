@@ -14,7 +14,7 @@ type User {
   이메일 (소셜 로그인에서 가져옴)
   본인 또는 관리자만 조회 가능
   """
-  email: String! @auth(requires: SELF_OR_ADMIN)
+  email: String @auth(requires: SELF_OR_ADMIN)
 
   "프로필 정보"
   profile: UserProfile!
@@ -35,7 +35,7 @@ type User {
   계정 상태
   본인 또는 관리자만 조회 가능
   """
-  status: UserStatus! @auth(requires: SELF_OR_ADMIN)
+  status: UserStatus @auth(requires: SELF_OR_ADMIN)
 }
 
 type UserProfile {
