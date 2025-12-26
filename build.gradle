@@ -28,6 +28,7 @@ configurations {
     compileOnly {
         extendsFrom annotationProcessor
     }
+    mockitoAgent
 }
 
 repositories {
@@ -77,6 +78,7 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-webflux'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testRuntimeOnly 'com.h2database:h2'
+    mockitoAgent('org.mockito:mockito-core:5.17.0') { transitive = false }
 }
 
 // ---------------------------------------------------------
@@ -102,6 +104,7 @@ tasks.withType(JavaCompile).configureEach {
 // ---------------------------------------------------------
 tasks.named('test') {
     useJUnitPlatform()
+    jvmArgs("-javaagent:${configurations.mockitoAgent.asPath}")
     finalizedBy jacocoTestReport
 }
 

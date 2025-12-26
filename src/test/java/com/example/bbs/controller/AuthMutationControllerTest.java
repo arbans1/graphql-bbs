@@ -2,6 +2,7 @@ package com.example.bbs.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
 
@@ -29,6 +30,7 @@ import com.example.bbs.domain.user.enums.UserStatus;
 import com.example.bbs.domain.user.error.UserFieldErrorCode;
 import com.example.bbs.domain.user.service.AuthService;
 import com.example.bbs.global.error.BusinessException;
+import com.example.bbs.global.error.ErrorCode;
 import com.example.bbs.global.error.FieldError;
 import com.example.bbs.global.security.JwtProperties;
 import com.example.bbs.global.security.JwtTokenProvider;
@@ -381,6 +383,130 @@ class AuthMutationControllerTest extends GraphQlTestBase {
 					.contains(JwtProperties.REFRESH_TOKEN_COOKIE_NAME + "=")
 					.contains("Max-Age=0")
 					.contains("Path=/"));
+		}
+	}
+
+	@Nested
+	@DisplayName("토큰 갱신(refreshToken) 테스트")
+	class RefreshTokenTest {
+
+		@Test
+		@DisplayName("토큰 갱신 성공 - 유효한 리프레시 토큰으로 새 액세스 토큰 발급")
+		void refreshToken_Success() {
+			// given
+			given(jwtProperties.getRefreshExpiration()).willReturn(3_600_000L);
+			User mockUser = User.builder()
+				.id("user-id")
+				.email("test@test.com")
+				.role(UserRole.MEMBER)
+				.status(UserStatus.ACTIVE)
+				.build();
+
+			AuthPayload mockPayload = new AuthPayload("new-access-token", mockUser, 3600L);
+			given(authService.refreshToken(anyString())).willReturn(mockPayload);
+
+			// when: GraphQL 요청 실행 (쿠키에서 리프레시 토큰 추출)
+			var response = graphQlTester.mutate()
+				.webTestClient(clientBuilder -> {
+					clientBuilder.defaultCookie(JwtProperties.REFRESH_TOKEN_COOKIE_NAME, "valid-refresh-token");
+				})
+				.build()
+				.documentName("auth/refreshToken")
+				.execute();
+
+			// then: 응답 바디 검증
+			response.errors().verify();
+			response.path("auth.refreshToken.accessToken").entity(String.class).isEqualTo("new-access-token");
+			response.path("auth.refreshToken.expiresIn").entity(Long.class).isEqualTo(3600L);
+			response.path("auth.refreshToken.user.id").entity(String.class).isEqualTo("user-id");
+			response.path("auth.refreshToken.user.email").entity(String.class).isEqualTo("test@test.com");
+			response.path("auth.refreshToken.user.role").entity(String.class).isEqualTo("MEMBER");
+			response.path("auth.refreshToken.user.status").entity(String.class).isEqualTo("ACTIVE");
+		}
+
+		@Test
+		@DisplayName("토큰 갱신 실패 - 리프레시 토큰 없음")
+		void refreshToken_Fail_NoToken() {
+			// given
+			willThrow(new BusinessException.AuthenticationException("인증 정보가 유효하지 않습니다."))
+				.given(authService).refreshToken(any());
+
+			// when: GraphQL 요청 실행 (쿠키 없이)
+			var response = graphQlTester.documentName("auth/refreshToken")
+				.execute();
+
+			// then: 에러 및 메시지 검증
+			response.errors().verify()
+				.path("auth.refreshToken.code").entity(String.class).isEqualTo("UNAUTHENTICATED")
+				.path("auth.refreshToken.message").entity(String.class)
+				.isEqualTo("인증 정보가 유효하지 않습니다.");
+		}
+
+		@Test
+		@DisplayName("토큰 갱신 실패 - 만료된 리프레시 토큰")
+		void refreshToken_Fail_ExpiredToken() {
+			// given
+			willThrow(new BusinessException.AuthenticationException(ErrorCode.TOKEN_EXPIRED, "세션이 만료되었습니다."))
+				.given(authService).refreshToken(any());
+
+			// when: GraphQL 요청 실행
+			var response = graphQlTester.mutate()
+				.webTestClient(clientBuilder -> {
+					clientBuilder.defaultCookie(JwtProperties.REFRESH_TOKEN_COOKIE_NAME, "expired-refresh-token");
+				})
+				.build()
+				.documentName("auth/refreshToken")
+				.execute();
+
+			// then: 에러 및 메시지 검증
+			response.errors().verify()
+				.path("auth.refreshToken.code").entity(String.class).isEqualTo("TOKEN_EXPIRED")
+				.path("auth.refreshToken.message").entity(String.class).isEqualTo("세션이 만료되었습니다.");
+		}
+
+		@Test
+		@DisplayName("토큰 갱신 실패 - 유효하지 않은 리프레시 토큰")
+		void refreshToken_Fail_InvalidToken() {
+			// given
+			willThrow(new BusinessException.AuthenticationException("인증 정보가 유효하지 않습니다."))
+				.given(authService).refreshToken(any());
+
+			// when: GraphQL 요청 실행
+			var response = graphQlTester.mutate()
+				.webTestClient(clientBuilder -> {
+					clientBuilder.defaultCookie(JwtProperties.REFRESH_TOKEN_COOKIE_NAME, "invalid-refresh-token");
+				})
+				.build()
+				.documentName("auth/refreshToken")
+				.execute();
+
+			// then: 에러 및 메시지 검증
+			response.errors().verify()
+				.path("auth.refreshToken.code").entity(String.class).isEqualTo("UNAUTHENTICATED")
+				.path("auth.refreshToken.message").entity(String.class)
+				.isEqualTo("인증 정보가 유효하지 않습니다.");
+		}
+
+		@Test
+		@DisplayName("토큰 갱신 실패 - 사용자 계정 비활성화")
+		void refreshToken_Fail_UserInactive() {
+			// given
+			willThrow(new BusinessException.ForbiddenException("로그인이 제한된 사용자입니다."))
+				.given(authService).refreshToken(any());
+
+			// when: GraphQL 요청 실행
+			var response = graphQlTester.mutate()
+				.webTestClient(clientBuilder -> {
+					clientBuilder.defaultCookie(JwtProperties.REFRESH_TOKEN_COOKIE_NAME, "valid-refresh-token");
+				})
+				.build()
+				.documentName("auth/refreshToken")
+				.execute();
+
+			// then: 에러 및 메시지 검증
+			response.errors().verify()
+				.path("auth.refreshToken.code").entity(String.class).isEqualTo("FORBIDDEN")
+				.path("auth.refreshToken.message").entity(String.class).isEqualTo("로그인이 제한된 사용자입니다.");
 		}
 	}
 }

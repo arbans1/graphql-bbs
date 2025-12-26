@@ -27,4 +27,4 @@ union RegisterPayload = AuthPayload | UserInputError
 
 union LoginPayload = AuthPayload | AuthenticationError | ForbiddenError
 
-union RefreshTokenPayload = AuthPayload | AuthenticationError
+union RefreshTokenPayload = AuthPayload | AuthenticationError | ForbiddenError

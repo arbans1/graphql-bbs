@@ -58,6 +58,10 @@ public abstract class BusinessException extends RuntimeException {
 		public AuthenticationException(String message) {
 			super(ErrorCode.UNAUTHENTICATED, message);
 		}
+
+		public AuthenticationException(ErrorCode errorCode, String message) {
+			super(errorCode, message);
+		}
 	}
 
 	/**

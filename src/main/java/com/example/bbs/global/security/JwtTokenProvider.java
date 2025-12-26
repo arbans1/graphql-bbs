@@ -16,6 +16,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -98,9 +99,12 @@ public class JwtTokenProvider {
 	 * @param token JWT 토큰
 	 * @param isAccessToken Access Token 여부
 	 * @return subject 클레임의 사용자 ID
-	 * @throws JwtException 토큰 검증 실패
+	 * @throws ExpiredJwtException 토큰 유효 시간이 만료된 경우
+	 * @throws JwtException 토큰 서명이 틀리거나 형식이 잘못된 경우
+	 * @throws IllegalArgumentException 토큰이 null이거나 비어있는 경우
 	 */
-	public String getUserIdFromToken(String token, boolean isAccessToken) {
+	public String getUserIdFromToken(String token, boolean isAccessToken)
+		throws ExpiredJwtException, JwtException, IllegalArgumentException {
 		SecretKey key = isAccessToken ? accessKey : refreshKey;
 
 		return Jwts.parser()

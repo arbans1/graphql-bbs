@@ -19,6 +19,7 @@ public enum ErrorCode {
 
 	// 401 - 인증 실패
 	UNAUTHENTICATED("UNAUTHENTICATED", "인증이 필요합니다."),
+	TOKEN_EXPIRED("TOKEN_EXPIRED", "세션이 만료되었습니다."),
 
 	// 403 - 권한 없음
 	FORBIDDEN("FORBIDDEN", "접근 권한이 없습니다."),

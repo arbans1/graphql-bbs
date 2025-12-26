@@ -23,6 +23,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
+
 import com.example.bbs.domain.user.dto.AuthPayload;
 import com.example.bbs.domain.user.dto.AuthTokens;
 import com.example.bbs.domain.user.dto.LoginInput;
@@ -37,6 +40,7 @@ import com.example.bbs.domain.user.mapper.UserMapper;
 import com.example.bbs.domain.user.repository.UserDuplicateView;
 import com.example.bbs.domain.user.repository.UserRepository;
 import com.example.bbs.global.error.BusinessException;
+import com.example.bbs.global.error.ErrorCode;
 import com.example.bbs.global.security.JwtProperties;
 import com.example.bbs.global.security.JwtTokenProvider;
 
@@ -70,8 +74,8 @@ class AuthServiceTest {
 
 	/** JWT 관련 Mock 설정 */
 	private void givenJwtSettings(String accessToken, String refreshToken, long expiresIn) {
-		when(jwtTokenProvider.createAccessToken(anyString(), anyString())).thenReturn(accessToken);
-		when(jwtTokenProvider.createRefreshToken(anyString())).thenReturn(refreshToken);
+		lenient().when(jwtTokenProvider.createAccessToken(anyString(), anyString())).thenReturn(accessToken);
+		lenient().when(jwtTokenProvider.createRefreshToken(anyString())).thenReturn(refreshToken);
 		lenient().when(jwtProperties.getAccessExpiration()).thenReturn(expiresIn);
 	}
 
@@ -90,11 +94,17 @@ class AuthServiceTest {
 			.status(UserStatus.ACTIVE)
 			.build();
 
-		AuthPayload mockPayload = new AuthPayload("access_token", mockUser, 3600L);
-		AuthTokens mockTokens = new AuthTokens(mockPayload, "refresh_token");
+		lenient().when(userMapper.toAuthPayload(any(), anyString(), anyLong())).thenAnswer(invocation -> {
+			String token = invocation.getArgument(1);
+			Long expiresIn = invocation.getArgument(2);
+			return new AuthPayload(token, mockUser, expiresIn);
+		});
 
-		when(userMapper.toAuthPayload(any(), anyString(), anyLong())).thenReturn(mockPayload);
-		when(userMapper.toAuthTokens(any(), anyString())).thenReturn(mockTokens);
+		lenient().when(userMapper.toAuthTokens(any(AuthPayload.class), anyString())).thenAnswer(invocation -> {
+			AuthPayload payload = invocation.getArgument(0);
+			String refreshToken = invocation.getArgument(1);
+			return new AuthTokens(payload, refreshToken);
+		});
 	}
 
 	// ========== 회원가입(register) 테스트 ==========
@@ -256,5 +266,116 @@ class AuthServiceTest {
 		// then
 		assertThat(result).isNotNull();
 		assertThat(result.message()).isEqualTo("로그아웃 되었습니다");
+	}
+
+	// ========== 토큰 갱신(refreshToken) 테스트 ==========
+
+	@Test
+	@DisplayName("토큰 갱신 성공 - 유효한 리프레시 토큰으로 새 액세스 토큰 발급")
+	void refreshToken_Success() {
+		// given
+		String refreshToken = "valid_refresh_token";
+		String userId = "user-123";
+		UserEntity user = UserEntity.builder()
+			.loginId("myuser")
+			.hashedPassword("hashed_pw")
+			.build();
+		ReflectionTestUtils.setField(user, "id", userId);
+
+		when(jwtTokenProvider.getUserIdFromToken(refreshToken, false)).thenReturn(userId);
+		when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+		givenJwtSettings("new_access_token", "refresh_token", 3600L);
+		givenUserMapperReturnsAuthTokens(userId, "test@test.com");
+
+		// when
+		AuthPayload result = authService.refreshToken(refreshToken);
+
+		// then
+		assertThat(result.accessToken()).isEqualTo("new_access_token");
+		assertThat(result.user().getId()).isEqualTo(userId);
+		verify(jwtTokenProvider).getUserIdFromToken(refreshToken, false);
+		verify(userRepository).findById(userId);
+	}
+
+	@Test
+	@DisplayName("토큰 갱신 실패 - null 리프레시 토큰")
+	void refreshToken_Fail_NullToken() {
+		// when & then
+		assertThatThrownBy(() -> authService.refreshToken(null))
+			.isInstanceOf(BusinessException.AuthenticationException.class);
+	}
+
+	@Test
+	@DisplayName("토큰 갱신 실패 - 빈 문자열 리프레시 토큰")
+	void refreshToken_Fail_BlankToken() {
+		// when & then
+		assertThatThrownBy(() -> authService.refreshToken("   "))
+			.isInstanceOf(BusinessException.AuthenticationException.class);
+	}
+
+	@Test
+	@DisplayName("토큰 갱신 실패 - 만료된 토큰")
+	void refreshToken_Fail_ExpiredToken() {
+		// given
+		String refreshToken = "expired_refresh_token";
+
+		when(jwtTokenProvider.getUserIdFromToken(refreshToken, false))
+			.thenThrow(new ExpiredJwtException(null, null, "토큰이 만료됨"));
+
+		// when & then
+		assertThatThrownBy(() -> authService.refreshToken(refreshToken))
+			.isInstanceOf(BusinessException.AuthenticationException.class)
+			.extracting(ex -> ((BusinessException.AuthenticationException)ex).getErrorCode())
+			.isEqualTo(ErrorCode.TOKEN_EXPIRED);
+	}
+
+	@Test
+	@DisplayName("토큰 갱신 실패 - 유효하지 않은 토큰")
+	void refreshToken_Fail_InvalidToken() {
+		// given
+		String refreshToken = "invalid_refresh_token";
+
+		when(jwtTokenProvider.getUserIdFromToken(refreshToken, false))
+			.thenThrow(new JwtException("토큰이 유효하지 않음"));
+
+		// when & then
+		assertThatThrownBy(() -> authService.refreshToken(refreshToken))
+			.isInstanceOf(BusinessException.AuthenticationException.class);
+	}
+
+	@Test
+	@DisplayName("토큰 갱신 실패 - 사용자 존재하지 않음")
+	void refreshToken_Fail_UserNotFound() {
+		// given
+		String refreshToken = "valid_refresh_token";
+		String userId = "nonexistent-user";
+
+		when(jwtTokenProvider.getUserIdFromToken(refreshToken, false)).thenReturn(userId);
+		when(userRepository.findById(userId)).thenReturn(Optional.empty());
+
+		// when & then
+		assertThatThrownBy(() -> authService.refreshToken(refreshToken))
+			.isInstanceOf(BusinessException.AuthenticationException.class);
+	}
+
+	@Test
+	@DisplayName("토큰 갱신 실패 - 사용자 계정 비활성화")
+	void refreshToken_Fail_UserInactive() {
+		// given
+		String refreshToken = "valid_refresh_token";
+		String userId = "user-123";
+		UserEntity user = UserEntity.builder()
+			.loginId("myuser")
+			.hashedPassword("hashed_pw")
+			.build();
+		ReflectionTestUtils.setField(user, "id", userId);
+		ReflectionTestUtils.setField(user, "status", UserStatus.SUSPENDED);
+
+		when(jwtTokenProvider.getUserIdFromToken(refreshToken, false)).thenReturn(userId);
+		when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+		// when & then
+		assertThatThrownBy(() -> authService.refreshToken(refreshToken))
+			.isInstanceOf(BusinessException.ForbiddenException.class);
 	}
 }

@@ -29,8 +29,22 @@ public class GraphQlInterceptor implements WebGraphQlInterceptor {
 
 	@Override
 	public Mono<WebGraphQlResponse> intercept(WebGraphQlRequest request, Chain chain) {
+		// 요청에서 리프레시 토큰 쿠키 추출 후 GraphQL 컨텍스트에 저장
+		extractAndContextualizeRefreshToken(request);
 		// 체인을 통해 생성된 응답에 쿠키를 부착
 		return chain.next(request).map(this::attachRefreshTokenCookieIfPresent);
+	}
+
+	private void extractAndContextualizeRefreshToken(WebGraphQlRequest request) {
+		var cookie = request.getCookies().getFirst(JwtProperties.REFRESH_TOKEN_COOKIE_NAME);
+
+		if (cookie != null && !cookie.getValue().isBlank()) {
+			String tokenValue = cookie.getValue();
+
+			request.configureExecutionInput((executionInput, builder) -> builder.graphQLContext(ctx -> ctx
+				.put(JwtProperties.RefreshTokenCookie.class, new JwtProperties.RefreshTokenCookie(tokenValue)))
+				.build());
+		}
 	}
 
 	/**
@@ -54,8 +68,9 @@ public class GraphQlInterceptor implements WebGraphQlInterceptor {
 		ResponseCookie cookie = (refreshTokenCookie.value() == null)
 			? jwtTokenProvider.createDeleteRefreshTokenCookie()
 			: jwtTokenProvider.createRefreshTokenCookie(refreshTokenCookie.value());
-
-		response.getResponseHeaders().add(HttpHeaders.SET_COOKIE, cookie.toString());
+		if (cookie != null) {
+			response.getResponseHeaders().add(HttpHeaders.SET_COOKIE, cookie.toString());
+		}
 		return response;
 	}
 
