@@ -88,8 +88,9 @@ public class AuthDirectiveWiring implements SchemaDirectiveWiring {
 		if (isAnonymous) {
 			return false;
 		}
-		boolean isAdmin = auth.getAuthorities().stream()
-			.anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+		boolean isAdmin = auth.getAuthorities() != null
+			&& auth.getAuthorities().stream()
+				.anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
 		String currentUserId = auth.getName();
 
 		// SELF 계열은 소유자 비교로 제한하고, 기타 역할은 명시된 권한만 통과
