@@ -2,7 +2,9 @@ package com.example.bbs.global.security;
 
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -17,7 +19,6 @@ import graphql.schema.idl.SchemaDirectiveWiringEnvironment;
 import lombok.RequiredArgsConstructor;
 
 import com.example.bbs.global.common.Ownable;
-import com.example.bbs.global.error.BusinessException;
 
 @Component
 @NullMarked
@@ -43,17 +44,18 @@ public class AuthDirectiveWiring implements SchemaDirectiveWiring {
 		// GraphQL 필드 실행 앞단에 권한 검증을 삽입
 		DataFetcher<?> authDataFetcher = dfe -> {
 			Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-			String containerName = fieldsContainer.getName();
-			// 루트(Query/Mutation) 필드에서는 권한 부족 시 예외를 던져 바로 실패
-			boolean isRootField = "Query".equals(containerName) || "Mutation".equals(containerName);
+			// 권한 체크 통과 시 즉시 원래 로직 실행
+			if (checkAccess(requiredRole, auth, dfe.getSource())) {
+				return originalDataFetcher.get(dfe);
+			}
 
-			if (!checkAccess(requiredRole, auth, dfe.getSource())) {
-				if (isRootField) {
-					throw new BusinessException.ForbiddenException("접근 권한이 없습니다.");
-				}
+			// 권한이 없는데 루트 필드가 아니면 null 반환
+			if (!isRootField(fieldsContainer)) {
 				return null;
 			}
-			return originalDataFetcher.get(dfe);
+
+			// 권한이 없는 루트 필드라면 상황에 맞는 예외 투척
+			throw createAuthException(auth);
 		};
 
 		env.getCodeRegistry().dataFetcher(
@@ -62,6 +64,18 @@ public class AuthDirectiveWiring implements SchemaDirectiveWiring {
 			authDataFetcher);
 
 		return env.getElement();
+	}
+
+	private boolean isRootField(GraphQLFieldsContainer container) {
+		String name = container.getName();
+		return "Query".equals(name) || "Mutation".equals(name);
+	}
+
+	private RuntimeException createAuthException(@Nullable Authentication auth) {
+		if (auth == null || auth instanceof AnonymousAuthenticationToken) {
+			return new InsufficientAuthenticationException("인증이 필요한 서비스입니다.");
+		}
+		return new AccessDeniedException("접근 권한이 없습니다.");
 	}
 
 	private boolean checkAccess(String requiredRole, Authentication auth, Object source) {
