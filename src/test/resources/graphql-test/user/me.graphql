@@ -1,0 +1,14 @@
+query Me {
+    me {
+        id
+        email
+        profile {
+            nickname
+            imageUrl
+        }
+        role
+        status
+        createdAt
+        lastLoginAt
+    }
+}
