@@ -1,0 +1,24 @@
+mutation Login($input: LoginInput!) {
+  auth {
+    login(input: $input) {
+      ... on AuthPayload {
+        accessToken
+        expiresIn
+        user {
+          id
+          email
+          role
+          status
+        }
+      }
+      ... on AuthenticationError {
+        message
+        code
+      }
+      ... on ForbiddenError {
+        message
+        code
+      }
+    }
+  }
+}

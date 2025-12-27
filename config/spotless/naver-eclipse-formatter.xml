@@ -252,7 +252,7 @@
 				 value="do not insert"/>
 		<!-- ex) Util.<Integer, String>compare(l1, l2); -->
 		<setting id="org.eclipse.jdt.core.formatter.insert_space_before_opening_brace_in_annotation_type_declaration"
-				 value="do not insert"/>
+				 value="insert"/>
 		<setting id="org.eclipse.jdt.core.formatter.insert_space_after_closing_angle_bracket_in_type_parameters"
 				 value="insert"/>
 		<setting id="org.eclipse.jdt.core.formatter.insert_space_before_and_in_type_parameter" value="insert"/>

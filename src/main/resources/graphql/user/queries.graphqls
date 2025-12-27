@@ -1,0 +1,11 @@
+extend type Query {
+  """
+  현재 인증된 사용자 정보 조회
+  """
+  me: User! @auth(requires: MEMBER)
+
+  """
+  특정 사용자 조회
+  """
+  user(id: ID!): User
+}

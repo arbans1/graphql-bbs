@@ -10,7 +10,7 @@ services:
       -public-host localhost:4443
       -port 4443
     volumes:
-      - ./.docker-data:/data
+      - ./.docker-data/gcs:/data
   postgres:
     image: postgres:17
     container_name: postgres
